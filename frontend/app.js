@@ -551,7 +551,40 @@ function setupModals() {
             currentCaseId = newCase.id;
             headerCaseNumber.textContent = newCase.case_number;
           }
-          showSecurityToast("Case Registered", `Official case ${caseNum} registered into forensic ledger.`);
+
+          // Clear previous evidence verification canvas for new case
+          currentEvidenceId = null;
+          currentVerificationData = null;
+          headerExhibitTitle.textContent = `Case ${newCase.case_number}: ${newCase.title}`;
+          headerExhibitId.textContent = "Awaiting Exhibit Intake";
+          headerStatusTag.className = "status-summary-tag";
+          headerStatusTag.textContent = "New Case Active";
+          verdictBanner.classList.add("hidden");
+          if (explanationCard) explanationCard.classList.add("hidden");
+          if (custodyHandoverCard) custodyHandoverCard.classList.add("hidden");
+          timelineCards.innerHTML = `
+            <div class="empty-timeline-notice">
+              Case <strong>${esc(newCase.case_number)}</strong> registered into ledger. Ready for initial exhibit intake.
+            </div>
+          `;
+
+          showSecurityToast("Case Registered", `Official case ${caseNum} registered. Opening evidence intake...`);
+
+          // Automatically open clean evidence ingestion modal for this new case
+          setTimeout(() => {
+            const evNameInput = document.getElementById("evidenceName");
+            const evContentInput = document.getElementById("evidenceContent");
+            const tamperToggle = document.getElementById("tamperToggle");
+            const tamperStepSelect = document.getElementById("tamperStepSelect");
+            if (tamperToggle) tamperToggle.checked = false;
+            if (tamperStepSelect) tamperStepSelect.value = "0";
+            if (evNameInput) evNameInput.value = `Exhibit-${newCase.case_number}-01`;
+            if (evContentInput) {
+              evContentInput.value = `FORENSIC_SEIZURE_STREAM: ${newCase.case_number}\nTITLE: ${newCase.title}\nTIME_RECORDED: ${new Date().toISOString()}\nORIGIN: Field Evidence Locker\nSTATUS: INTAKE_PENDING`;
+            }
+            scenarioModal.classList.remove("hidden");
+          }, 400);
+
         } else {
           const errData = await res.json().catch(() => ({ detail: "Failed to register case" }));
           showSecurityToast("Registration Failed", errData.detail || "Unable to register case.");
@@ -572,6 +605,12 @@ function setupModals() {
       showSecurityToast("Action Restricted", `${meta.roleName} cannot inject simulated tamper scenarios.`);
       return;
     }
+    const tamperToggle = document.getElementById("tamperToggle");
+    const tamperStepSelect = document.getElementById("tamperStepSelect");
+    if (tamperToggle) tamperToggle.checked = true;
+    if (tamperStepSelect) tamperStepSelect.value = "3";
+    const titleElem = document.getElementById("ingestModalTitle");
+    if (titleElem) titleElem.textContent = "Simulate Tamper Scenario";
     scenarioModal.classList.remove("hidden");
   });
 
@@ -581,8 +620,27 @@ function setupModals() {
       showSecurityToast("Action Restricted (Read-Only)", `${meta.roleName} is an independent oversight role and cannot ingest evidence.`);
       return;
     }
-    scenarioModal.classList.remove("hidden");
     const evNameInput = document.getElementById("evidenceName");
+    const evContentInput = document.getElementById("evidenceContent");
+    const tamperToggle = document.getElementById("tamperToggle");
+    const tamperStepSelect = document.getElementById("tamperStepSelect");
+    const titleElem = document.getElementById("ingestModalTitle");
+    const submitBtn = document.getElementById("runCustomBtn");
+
+    if (titleElem) titleElem.textContent = "Ingest Digital Evidence";
+    if (submitBtn) submitBtn.querySelector("span").textContent = "Ingest Evidence (Step 1)";
+    if (tamperToggle) tamperToggle.checked = false;
+    if (tamperStepSelect) tamperStepSelect.value = "0";
+
+    const randNum = Math.floor(Math.random() * 9000 + 1000);
+    if (evNameInput && (!evNameInput.value || evNameInput.value.includes("Exhibit-"))) {
+      evNameInput.value = `Exhibit-Seized-Device-#${randNum}`;
+    }
+    if (evContentInput && !evContentInput.value) {
+      evContentInput.value = `PHYSICAL_EVIDENCE_SEIZURE_BATCH_${randNum}\nORIGIN: Secure Evidence Locker\nDEVICE: Forensic Mobile Bitstream Extraction\nSTATUS: IN_CUSTODY`;
+    }
+
+    scenarioModal.classList.remove("hidden");
     if (evNameInput) evNameInput.focus();
   });
 
@@ -622,13 +680,14 @@ function setupModals() {
         const res = await apiFetch(`${API_BASE}/api/v1/audit/verify`);
         if (res.ok) {
           const data = await res.json();
-          if (data.status === "VALID" || data.status === "INTACT") {
+          if (data.valid === true || data.status === "VALID" || data.status === "INTACT" || data.status === "AUDIT_CHAIN_INTACT") {
+            const count = data.count !== undefined ? data.count : (data.events_checked || 0);
             auditVerifyStatus.className = "audit-verify-banner intact";
-            auditVerifyStatus.textContent = `✓ Audit Ledger Intact: ${data.events_checked} records cryptographically verified via unbroken SHA-256 hash continuity.`;
+            auditVerifyStatus.textContent = `✓ Audit Ledger Intact: ${count} records cryptographically verified via unbroken SHA-256 hash continuity.`;
             auditVerifyStatus.classList.remove("hidden");
           } else {
             auditVerifyStatus.className = "audit-verify-banner failed";
-            auditVerifyStatus.textContent = `✕ Break Detected: Record #${data.broken_event_id || 'N/A'} hash mismatch.`;
+            auditVerifyStatus.textContent = `✕ Break Detected: Record #${data.broken_at_id || data.broken_event_id || 'N/A'} hash mismatch.`;
             auditVerifyStatus.classList.remove("hidden");
           }
         } else {

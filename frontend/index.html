@@ -117,9 +117,9 @@
           <span class="btn-symbol">▶</span>
           <span id="runSampleBtnLabel">Quick Ingestion</span>
         </button>
-        <button id="newEvidenceBtn" class="btn-sidebar-secondary" title="Ingest new exhibit artifact or simulate tamper">
-          <span class="btn-symbol">⚙</span>
-          <span id="newEvidenceBtnLabel">Simulation / Ingestion</span>
+        <button id="newEvidenceBtn" class="btn-sidebar-secondary" title="Register new evidence exhibit into active case">
+          <span class="btn-symbol">+</span>
+          <span id="newEvidenceBtnLabel">Ingest Evidence</span>
         </button>
         <button id="openAuditBtn" class="btn-sidebar-ghost" title="View immutable system audit logs">
           <span class="btn-symbol">≡</span>
@@ -330,49 +330,61 @@
     </main>
   </div>
 
-  <!-- SIMULATION / CUSTOM INGESTION MODAL (MOVED BEHIND MODAL SO IT NEVER CLUTTERS NORMAL VIEW) -->
+  <!-- INGEST EVIDENCE MODAL -->
   <div class="modal-overlay hidden" id="scenarioModal">
     <div class="modal-card modal-card-compact">
       <div class="modal-header">
         <div class="modal-title-wrap">
-          <h3 class="modal-title">Simulation &amp; Test Scenario</h3>
-          <span class="modal-subtitle">Inject silent mutations to test independent verification</span>
+          <h3 class="modal-title" id="ingestModalTitle">Ingest Digital Evidence</h3>
+          <span class="modal-subtitle">Official evidence registration into active case (Step 1 Intake)</span>
         </div>
         <button class="modal-close" id="closeDrawerBtn">✕</button>
       </div>
       <div class="modal-body">
         <div class="form-row">
           <div class="form-group flex-2">
-            <label for="evidenceName">Exhibit Name / Description</label>
-            <input type="text" id="evidenceName" placeholder="Case-2026-Exhibit-A" />
-          </div>
-          <div class="form-group flex-2">
-            <label for="tamperStepSelect">Inject Tamper At Handler</label>
-            <select id="tamperStepSelect">
-              <option value="3">Step 3 — Export Tool (Silent CRLF Alteration)</option>
-              <option value="2">Step 2 — Analyst Tool (Unauthorized Metadata Tag)</option>
-              <option value="4">Step 4 — Reviewer (Unlogged Redaction)</option>
-              <option value="5">Step 5 — Archive (Storage Bit-Rot)</option>
-              <option value="0">None — Pure Verified Intact Chain</option>
-            </select>
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group flex-1 checkbox-group">
-            <label class="checkbox-label" for="tamperToggle">
-              <input type="checkbox" id="tamperToggle" checked />
-              <span>Simulate silent tamper at designated handler</span>
-            </label>
+            <label for="evidenceName">Exhibit Name / Reference</label>
+            <input type="text" id="evidenceName" placeholder="e.g. Seized-Device-MemoryDump-01" />
           </div>
         </div>
         <div class="form-group">
-          <label for="evidenceContent">Digital Artifact Content (Simulated Raw Stream)</label>
+          <label for="evidenceContent">Digital Artifact Content (Raw Bitstream / Forensic Stream)</label>
           <textarea id="evidenceContent" rows="4" placeholder="Enter or paste raw exhibit content..."></textarea>
         </div>
+
+        <!-- OPTIONAL TESTING / SIMULATION ACCORDION (UNCHECKED BY DEFAULT) -->
+        <details class="sim-advanced-details" style="margin-top: 10px; margin-bottom: 12px; font-size: 11px;">
+          <summary style="cursor: pointer; color: var(--text-dim); padding: 4px 0;">
+            ⚙ Advanced Testing: Simulate silent corruption (Optional)
+          </summary>
+          <div style="background: var(--bg-inset); padding: 10px; border-radius: 6px; margin-top: 6px; border: 1px solid var(--border-subtle);">
+            <div class="form-row">
+              <div class="form-group flex-1 checkbox-group" style="margin-bottom: 8px;">
+                <label class="checkbox-label" for="tamperToggle">
+                  <input type="checkbox" id="tamperToggle" />
+                  <span>Simulate silent corruption at handler</span>
+                </label>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group flex-1">
+                <label for="tamperStepSelect" style="font-size: 10px;">Corrupt At Handler Step</label>
+                <select id="tamperStepSelect" style="font-size: 11px;">
+                  <option value="0" selected>None — Authentic Clean Intake (Step 1)</option>
+                  <option value="3">Step 3 — Export Tool (Silent CRLF Alteration)</option>
+                  <option value="2">Step 2 — Analyst Tool (Unauthorized Metadata Tag)</option>
+                  <option value="4">Step 4 — Reviewer (Unlogged Redaction)</option>
+                  <option value="5">Step 5 — Archive (Storage Bit-Rot)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </details>
+
         <div class="modal-actions-bar">
           <button id="cancelModalBtn" class="btn-sidebar-ghost">Cancel</button>
           <button id="runCustomBtn" class="btn-sidebar-primary">
-            <span>Execute Pipeline</span>
+            <span>Ingest Evidence (Step 1)</span>
           </button>
         </div>
       </div>

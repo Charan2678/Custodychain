@@ -78,7 +78,29 @@ def test_api():
         hist = json.loads(res.read().decode())
         print(f"6. Legacy /history OK: {len(hist)} items returned")
 
+    # 7. Clean up test exhibit so automated testing does not pollute the DB with broken records
+    try:
+        import sys
+        import os
+        from sqlalchemy import text
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
+        from database import SessionLocal
+        import models
+        db = SessionLocal()
+        db.execute(text("SET FOREIGN_KEY_CHECKS = 0;"))
+        db.query(models.CustodyEvent).filter(models.CustodyEvent.evidence_id == evidence_id).delete()
+        db.query(models.CustodyLog).filter(models.CustodyLog.evidence_id == evidence_id).delete()
+        db.query(models.Artifact).filter(models.Artifact.evidence_id == evidence_id).delete()
+        db.query(models.Evidence).filter(models.Evidence.id == evidence_id).delete()
+        db.execute(text("SET FOREIGN_KEY_CHECKS = 1;"))
+        db.commit()
+        db.close()
+        print(f"7. Cleanup OK: Removed temporary test exhibit #{evidence_id} from database.")
+    except Exception as e:
+        print(f"Note: Cleanup skipped: {e}")
+
     print("\n>>> ALL PRODUCTION END-TO-END WORKFLOWS PASSED 100% SUCCESSFULLY! <<<")
 
 if __name__ == "__main__":
     test_api()
+

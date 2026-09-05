@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -7,7 +8,7 @@ from database import engine, get_db, Base, SessionLocal
 import models
 from services.custody_service import process_evidence_pipeline
 from services.verifier_service import verify_evidence_integrity
-from security.auth import hash_password
+from security.auth import hash_password, require_role, get_current_user
 
 # Import v1 routers
 from api.v1.auth import router as auth_router
@@ -26,9 +27,13 @@ app = FastAPI(
     description="Enterprise Digital Evidence Custody & Cryptographic Verification Platform",
 )
 
+# Parse allowed origins from configuration
+cors_origins_raw = os.environ.get("CORS_ORIGINS", "http://localhost:5500,http://127.0.0.1:5500,http://localhost:8000,http://127.0.0.1:8000")
+origins = [o.strip() for o in cors_origins_raw.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -44,7 +49,7 @@ app.include_router(audit_router, prefix="/api/v1")
 
 
 # ---------------------------------------------------------------------------
-# Startup Seeding: Handlers, Default Admin, Default Case
+# Startup Seeding: Handlers, Multi-Role Users, Default Case
 # ---------------------------------------------------------------------------
 HANDLER_SEED = [
     {"name": "Collector",    "step_order": 1},
@@ -52,6 +57,13 @@ HANDLER_SEED = [
     {"name": "Export Tool",  "step_order": 3},
     {"name": "Reviewer",     "step_order": 4},
     {"name": "Archive",      "step_order": 5},
+]
+
+USER_SEED = [
+    {"email": "charan@custodychain.internal", "name": "Charan", "role": "SYSTEM_ADMIN"},
+    {"email": "officer@custodychain.internal", "name": "Evidence Officer", "role": "EVIDENCE_OFFICER"},
+    {"email": "analyst@custodychain.internal", "name": "Forensic Analyst", "role": "FORENSIC_ANALYST"},
+    {"email": "auditor@custodychain.internal", "name": "Independent Auditor", "role": "AUDITOR"},
 ]
 
 
@@ -67,19 +79,23 @@ def seed_database():
             db.commit()
             print("[CustodyChain] Handlers seeded.")
 
-        # 2. Seed Default User (Charan)
-        default_user = db.query(models.User).filter(models.User.email == "charan@custodychain.internal").first()
-        if not default_user:
-            default_user = models.User(
-                email="charan@custodychain.internal",
-                password_hash=hash_password("evidence123"),
-                name="Charan",
-                role="SYSTEM_ADMIN",
-                is_active=True,
-            )
-            db.add(default_user)
-            db.commit()
-            print("[CustodyChain] Default administrator (Charan) seeded.")
+        # 2. Seed Role Users for Evaluation
+        for u in USER_SEED:
+            user = db.query(models.User).filter(models.User.email == u["email"]).first()
+            if not user:
+                user = models.User(
+                    email=u["email"],
+                    password_hash=hash_password("evidence123"),
+                    name=u["name"],
+                    role=u["role"],
+                    is_active=True,
+                )
+                db.add(user)
+            else:
+                user.role = u["role"]
+                user.is_active = True
+        db.commit()
+        print("[CustodyChain] Production users and RBAC personas seeded.")
 
         # 3. Seed Default Case
         case_count = db.query(models.Case).count()
@@ -100,7 +116,7 @@ def seed_database():
 
 
 # ---------------------------------------------------------------------------
-# Backward-Compatible Legacy Request Schemas & Routes
+# Backward-Compatible Legacy Request Schemas & Routes (Guarded by RBAC)
 # ---------------------------------------------------------------------------
 class EvidenceCreateRequest(BaseModel):
     name: str
@@ -110,8 +126,11 @@ class EvidenceCreateRequest(BaseModel):
 
 
 @app.post("/evidence", summary="[Legacy] Create evidence and run pipeline")
-def create_evidence_legacy(payload: EvidenceCreateRequest, db: Session = Depends(get_db)):
-    # Auto-link to default case if available
+def create_evidence_legacy(
+    payload: EvidenceCreateRequest,
+    current_user: models.User = Depends(require_role(["FORENSIC_ANALYST", "EVIDENCE_OFFICER", "SYSTEM_ADMIN"])),
+    db: Session = Depends(get_db),
+):
     default_case = db.query(models.Case).first()
     case_id = default_case.id if default_case else None
 
@@ -123,7 +142,7 @@ def create_evidence_legacy(payload: EvidenceCreateRequest, db: Session = Depends
         exhibit_id=f"EX-{evidence_name_slug(payload.name)}",
         simulate_tamper=payload.simulate_tamper,
         tamper_step=payload.tamper_step,
-        created_by="Charan",
+        created_by=current_user.name,
     )
     return {"evidence_id": evidence.id, "name": evidence.name}
 
@@ -192,8 +211,12 @@ def get_custody_log_legacy(evidence_id: int, db: Session = Depends(get_db)):
 
 
 @app.get("/evidence/{evidence_id}/verify", summary="[Legacy] Run Verifier and get verdict")
-def verify_evidence_legacy(evidence_id: int, db: Session = Depends(get_db)):
+def verify_evidence_legacy(
+    evidence_id: int,
+    current_user: models.User = Depends(require_role(["FORENSIC_ANALYST", "AUDITOR", "SYSTEM_ADMIN"])),
+    db: Session = Depends(get_db),
+):
     evidence = db.query(models.Evidence).filter(models.Evidence.id == evidence_id).first()
     if not evidence:
         raise HTTPException(status_code=404, detail="Evidence not found")
-    return verify_evidence_integrity(db, evidence_id)
+    return verify_evidence_integrity(db, evidence_id, auditor_name=current_user.name)

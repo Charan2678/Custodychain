@@ -4,89 +4,91 @@ from database import Base
 
 
 # ---------------------------------------------------------------------------
-# Core User & Identity
+# Identity & RBAC Models
 # ---------------------------------------------------------------------------
 class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    email = Column(String(255), unique=True, nullable=False, index=True)
+    email = Column(String(150), unique=True, index=True, nullable=False)
     password_hash = Column(String(255), nullable=False)
     name = Column(String(100), nullable=False)
     role = Column(String(50), default="FORENSIC_ANALYST", nullable=False)
-    # Roles: EVIDENCE_OFFICER, FORENSIC_ANALYST, AUDITOR, SYSTEM_ADMIN
-    is_active = Column(Boolean, default=True)
+    is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, server_default=func.now())
 
 
 # ---------------------------------------------------------------------------
-# Investigation Cases
+# Case & Investigation Context Models
 # ---------------------------------------------------------------------------
 class Case(Base):
     __tablename__ = "cases"
 
     id = Column(Integer, primary_key=True, index=True)
-    case_number = Column(String(50), unique=True, nullable=False, index=True)
+    case_number = Column(String(50), unique=True, index=True, nullable=False)
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
-    status = Column(String(30), default="OPEN", nullable=False)  # OPEN, CLOSED, ARCHIVED
-    created_by = Column(String(100), default="Charan", nullable=False)
+    status = Column(String(30), default="OPEN", nullable=False)
+    created_by = Column(String(100), nullable=False)
     created_at = Column(DateTime, server_default=func.now())
 
 
 # ---------------------------------------------------------------------------
-# Digital Evidence Root
-# ---------------------------------------------------------------------------
-class Evidence(Base):
-    __tablename__ = "evidence"
-
-    id = Column(Integer, primary_key=True, index=True)
-    case_id = Column(Integer, ForeignKey("cases.id"), nullable=True, index=True)
-    exhibit_id = Column(String(50), nullable=True)  # e.g., EV-001, EXHIBIT-A
-    name = Column(String(255), nullable=False)
-    original_content = Column(Text, nullable=False)  # Legacy string preservation
-    original_hash = Column(String(64), nullable=False)
-    media_type = Column(String(100), default="text/plain")
-    size_bytes = Column(Integer, default=0)
-    status = Column(String(30), default="VERIFIED")  # PENDING, VERIFIED, BROKEN, ARCHIVED
-    created_by = Column(String(100), default="Investigator")
-    created_at = Column(DateTime, server_default=func.now())
-
-
-# ---------------------------------------------------------------------------
-# Immutable Versioned Artifacts
+# Evidence Artifacts (WORM Storage Mapping)
 # ---------------------------------------------------------------------------
 class Artifact(Base):
     __tablename__ = "artifacts"
 
     id = Column(Integer, primary_key=True, index=True)
-    evidence_id = Column(Integer, ForeignKey("evidence.id"), nullable=False, index=True)
+    evidence_id = Column(Integer, ForeignKey("evidence.id"), nullable=False)
     parent_artifact_id = Column(Integer, ForeignKey("artifacts.id"), nullable=True)
-    sequence = Column(Integer, nullable=False)
+    sequence = Column(Integer, default=0, nullable=False)
     storage_key = Column(String(255), nullable=False)
     sha256 = Column(String(64), nullable=False)
+    size_bytes = Column(Integer, nullable=True)
+    media_type = Column(String(100), default="text/plain", nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+    @property
+    def sha256_hash(self):
+        return self.sha256
+
+
+# ---------------------------------------------------------------------------
+# Core Evidence Record
+# ---------------------------------------------------------------------------
+class Evidence(Base):
+    __tablename__ = "evidence"
+
+    id = Column(Integer, primary_key=True, index=True)
+    case_id = Column(Integer, ForeignKey("cases.id"), nullable=True)
+    exhibit_id = Column(String(50), unique=True, index=True, nullable=False)
+    name = Column(String(255), nullable=False)
+    original_hash = Column(String(64), nullable=False)
     size_bytes = Column(Integer, default=0)
-    media_type = Column(String(100), default="text/plain")
+    original_content = Column(Text, nullable=False)
+    status = Column(String(20), default="ACQUIRED", nullable=False)
+    created_by = Column(String(100), nullable=False)
     created_at = Column(DateTime, server_default=func.now())
 
 
 # ---------------------------------------------------------------------------
-# Hash-Linked & Signed Custody Ledger
+# Cryptographic Custody Ledger (Hash-Chained & Ed25519 Signed)
 # ---------------------------------------------------------------------------
 class CustodyEvent(Base):
     __tablename__ = "custody_events"
 
     id = Column(Integer, primary_key=True, index=True)
-    evidence_id = Column(Integer, ForeignKey("evidence.id"), nullable=False, index=True)
+    evidence_id = Column(Integer, ForeignKey("evidence.id"), nullable=False)
     sequence_number = Column(Integer, nullable=False)
     handler_name = Column(String(100), nullable=False)
     action = Column(String(100), nullable=False)
-    input_artifact_id = Column(Integer, nullable=True)
-    output_artifact_id = Column(Integer, nullable=True)
+    input_artifact_id = Column(Integer, ForeignKey("artifacts.id"), nullable=True)
+    output_artifact_id = Column(Integer, ForeignKey("artifacts.id"), nullable=True)
     hash_before = Column(String(64), nullable=False)
     hash_after = Column(String(64), nullable=False)
-    declared_status = Column(String(30), default="success")
-    verification_status = Column(String(30), default="VERIFIED")  # VERIFIED, BROKEN, DOWNSTREAM
+    declared_status = Column(String(20), default="success", nullable=False)
+    verification_status = Column(String(20), default="UNVERIFIED", nullable=False)
     timestamp = Column(DateTime, server_default=func.now())
     previous_event_hash = Column(String(64), nullable=False)
     event_hash = Column(String(64), nullable=False)
@@ -95,7 +97,7 @@ class CustodyEvent(Base):
 
 
 # ---------------------------------------------------------------------------
-# System Audit Trail
+# System Audit Trail (Cryptographic Hash Chained)
 # ---------------------------------------------------------------------------
 class AuditEvent(Base):
     __tablename__ = "audit_events"
@@ -106,11 +108,14 @@ class AuditEvent(Base):
     resource_type = Column(String(50), nullable=False)
     resource_id = Column(String(100), nullable=False)
     details = Column(Text, nullable=True)
+    previous_event_hash = Column(String(64), nullable=True)
+    event_hash = Column(String(64), nullable=True)
+    ip_address = Column(String(45), nullable=True)
     timestamp = Column(DateTime, server_default=func.now())
 
 
 # ---------------------------------------------------------------------------
-# Legacy compatibility models
+# Handlers & Legacy compatibility models
 # ---------------------------------------------------------------------------
 class Handler(Base):
     __tablename__ = "handlers"
@@ -139,5 +144,7 @@ class VerificationResult(Base):
     id = Column(Integer, primary_key=True, index=True)
     evidence_id = Column(Integer, ForeignKey("evidence.id"), nullable=False)
     final_verdict = Column(String(50), nullable=False)
+    broken_step_order = Column(Integer, nullable=True)
+    broken_handler_id = Column(Integer, ForeignKey("handlers.id"), nullable=True)
     broken_step_id = Column(Integer, ForeignKey("handlers.id"), nullable=True)
     checked_at = Column(DateTime, server_default=func.now())

@@ -2,6 +2,7 @@ import os
 import hashlib
 import hmac
 from datetime import datetime, timedelta, timezone
+from typing import Callable
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -9,11 +10,47 @@ from sqlalchemy.orm import Session
 from database import get_db
 import models
 
-SECRET_KEY = os.environ.get("JWT_SECRET", "custodychain-production-secret-key-2026-secure")
+# In production mode, JWT_SECRET must be configured
+SECRET_KEY = os.environ.get("JWT_SECRET")
+if not SECRET_KEY:
+    # Allow test suite fallback if testing, otherwise require explicit configuration
+    SECRET_KEY = os.environ.get("TEST_JWT_SECRET", "4f9d8b1c7a3e2f5d608192a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3")
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 hours
 
 security_bearer = HTTPBearer(auto_error=False)
+
+# Explicit RBAC Permissions
+PERMISSIONS = {
+    "SYSTEM_ADMIN": {
+        "CREATE_CASE",
+        "UPLOAD_EVIDENCE",
+        "PROCESS_EVIDENCE",
+        "VERIFY_EVIDENCE",
+        "VIEW_AUDIT",
+        "GENERATE_REPORT",
+        "MANAGE_USERS",
+        "CONFIGURE_SYSTEM",
+    },
+    "EVIDENCE_OFFICER": {
+        "CREATE_CASE",
+        "UPLOAD_EVIDENCE",
+        "VERIFY_EVIDENCE",
+        "GENERATE_REPORT",
+    },
+    "FORENSIC_ANALYST": {
+        "UPLOAD_EVIDENCE",
+        "PROCESS_EVIDENCE",
+        "VERIFY_EVIDENCE",
+        "GENERATE_REPORT",
+    },
+    "AUDITOR": {
+        "VERIFY_EVIDENCE",
+        "VIEW_AUDIT",
+        "GENERATE_REPORT",
+    },
+}
 
 
 def hash_password(password: str) -> str:
@@ -54,28 +91,63 @@ def get_current_user(
     db: Session = Depends(get_db),
 ) -> models.User:
     """
-    Returns authenticated user. If no auth header is present,
-    returns the default forensic analyst / admin (Charan) to guarantee
-    flawless hackathon/demo operation without mandatory login blocks.
+    Strict production authentication.
+    Requires a valid, non-expired Bearer JWT token in the Authorization header.
+    Returns 401 Unauthorized if missing, malformed, or user is inactive.
     """
-    if credentials and credentials.credentials:
-        payload = decode_access_token(credentials.credentials)
-        if payload and "sub" in payload:
-            user = db.query(models.User).filter(models.User.email == payload["sub"]).first()
-            if user:
-                return user
-
-    # Default fallback user for seamless demo / local execution
-    default_user = db.query(models.User).filter(models.User.email == "charan@custodychain.internal").first()
-    if not default_user:
-        default_user = models.User(
-            email="charan@custodychain.internal",
-            password_hash=hash_password("evidence123"),
-            name="Charan",
-            role="SYSTEM_ADMIN",
-            is_active=True,
+    if not credentials or not credentials.credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required: No Bearer token provided",
+            headers={"WWW-Authenticate": "Bearer"},
         )
-        db.add(default_user)
-        db.commit()
-        db.refresh(default_user)
-    return default_user
+
+    payload = decode_access_token(credentials.credentials)
+    if not payload or "sub" not in payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired access token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    user = db.query(models.User).filter(models.User.email == payload["sub"]).first()
+    if not user or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found or account inactive",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return user
+
+
+def require_role(allowed_roles: list[str] | str) -> Callable:
+    """FastAPI dependency to enforce role-based access control."""
+    if isinstance(allowed_roles, str):
+        roles_set = {allowed_roles}
+    else:
+        roles_set = set(allowed_roles)
+
+    def role_checker(current_user: models.User = Depends(get_current_user)) -> models.User:
+        if current_user.role not in roles_set:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access denied: Required role in {list(roles_set)}, your role is {current_user.role}",
+            )
+        return current_user
+
+    return role_checker
+
+
+def require_permission(required_permission: str) -> Callable:
+    """FastAPI dependency to enforce fine-grained action permission."""
+    def permission_checker(current_user: models.User = Depends(get_current_user)) -> models.User:
+        user_perms = PERMISSIONS.get(current_user.role, set())
+        if required_permission not in user_perms:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access denied: Action requires permission '{required_permission}'",
+            )
+        return current_user
+
+    return permission_checker

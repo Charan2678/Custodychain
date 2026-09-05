@@ -18,10 +18,11 @@ GENESIS_PREV_HASH = "0" * 64
 def verify_evidence_integrity(db: Session, evidence_id: int, auditor_name: str = "System Verifier") -> dict:
     """
     Executes authoritative, multi-vector verification:
-    Vector 1: Cryptographic Ledger Chain (previous_event_hash -> event_hash)
-    Vector 2: Handler Ed25519 Digital Signatures
+    Vector 1: Cryptographic Ledger Continuity (previous_event_hash -> event_hash)
+    Vector 2: Handler Ed25519 Digital Signatures against Registered Public Keys
     Vector 3: Physical Storage Artifact Integrity & Hash Recomputation
-    Vector 4: Forensic Non-Mutating Handler Invariance
+    Vector 4: Artifact Relationship Continuity (Step N input == Step N-1 output)
+    Vector 5: Forensic Non-Mutating Handler Invariance
     """
     evidence = db.query(models.Evidence).filter(models.Evidence.id == evidence_id).first()
     if not evidence:
@@ -35,21 +36,22 @@ def verify_evidence_integrity(db: Session, evidence_id: int, auditor_name: str =
     )
 
     if not events:
-        # Fallback to legacy verifier if no v1 events exist
         from services.verifier import verify_chain
         return verify_chain(db, evidence_id)
 
     step_results = []
     broken_step_order = None
+    broken_step_reason = None
     final_verdict = "CHAIN_INTACT"
     chain_broken_already = False
     expected_prev_hash = GENESIS_PREV_HASH
     previous_content_hash = evidence.original_hash
+    previous_output_artifact_id = None
 
     for ev in events:
         step_errors = []
 
-        # --- Vector 1: Ledger Chain Integrity ---
+        # --- Vector 1: Ledger Chain Continuity ---
         ledger_valid = (ev.previous_event_hash == expected_prev_hash)
         if not ledger_valid:
             step_errors.append("Ledger hash link mismatch.")
@@ -80,7 +82,7 @@ def verify_evidence_integrity(db: Session, evidence_id: int, auditor_name: str =
         if not sig_valid:
             step_errors.append("Ed25519 digital signature invalid or forged.")
 
-        # --- Vector 3: Physical Artifact Recomputation ---
+        # --- Vector 3: Physical Storage Artifact Integrity ---
         artifact_recomputed_hash = None
         artifact_valid = True
         if ev.output_artifact_id:
@@ -95,10 +97,32 @@ def verify_evidence_integrity(db: Session, evidence_id: int, auditor_name: str =
                 artifact_valid = False
                 step_errors.append("Output artifact missing from storage.")
 
-        # --- Vector 4: Non-Mutating Handler Rules ---
+        # --- Vector 4: Artifact Relationship Continuity ---
+        artifact_continuity_valid = True
+        if ev.sequence_number > 1 and previous_output_artifact_id:
+            if ev.input_artifact_id != previous_output_artifact_id:
+                artifact_continuity_valid = False
+                step_errors.append(
+                    f"Artifact continuity severed: Input artifact #{ev.input_artifact_id} "
+                    f"does not match preceding output artifact #{previous_output_artifact_id}."
+                )
+
+        # Confirm artifacts belong to this evidence
+        if ev.input_artifact_id:
+            in_art = db.query(models.Artifact).filter(models.Artifact.id == ev.input_artifact_id).first()
+            if not in_art or in_art.evidence_id != evidence_id:
+                artifact_continuity_valid = False
+                step_errors.append(f"Input artifact #{ev.input_artifact_id} does not belong to this evidence.")
+
+        if ev.output_artifact_id:
+            out_art = db.query(models.Artifact).filter(models.Artifact.id == ev.output_artifact_id).first()
+            if not out_art or out_art.evidence_id != evidence_id:
+                artifact_continuity_valid = False
+                step_errors.append(f"Output artifact #{ev.output_artifact_id} does not belong to this evidence.")
+
+        # --- Vector 5: Non-Mutating Handler Invariance ---
         content_intact = True
         if ev.handler_name in NON_MUTATING_STEPS:
-            # Recomputed hash must equal previous step's hash
             if artifact_recomputed_hash:
                 content_intact = (artifact_recomputed_hash == previous_content_hash)
             else:
@@ -111,6 +135,7 @@ def verify_evidence_integrity(db: Session, evidence_id: int, auditor_name: str =
             event_hash_valid and
             sig_valid and
             artifact_valid and
+            artifact_continuity_valid and
             content_intact
         )
 
@@ -119,10 +144,16 @@ def verify_evidence_integrity(db: Session, evidence_id: int, auditor_name: str =
             handler_slug = ev.handler_name.replace(" ", "_").upper()
             if not sig_valid:
                 final_verdict = f"SIGNATURE_INVALID_AT_STEP_{ev.sequence_number}_{handler_slug}"
+                broken_step_reason = "SIGNATURE_INVALID"
             elif not ledger_valid or not event_hash_valid:
                 final_verdict = f"LEDGER_BROKEN_AT_STEP_{ev.sequence_number}_{handler_slug}"
+                broken_step_reason = "LEDGER_LINK_BROKEN"
+            elif not artifact_continuity_valid:
+                final_verdict = f"ARTIFACT_CHAIN_DISCONNECTED_AT_STEP_{ev.sequence_number}_{handler_slug}"
+                broken_step_reason = "ARTIFACT_CHAIN_DISCONNECTED"
             else:
                 final_verdict = f"CHAIN_BROKEN_AT_STEP_{ev.sequence_number}_{handler_slug}"
+                broken_step_reason = "STORAGE_HASH_MISMATCH"
             chain_broken_already = True
 
         step_results.append({
@@ -133,10 +164,12 @@ def verify_evidence_integrity(db: Session, evidence_id: int, auditor_name: str =
             "hash_after": ev.hash_after,
             "actual_hash": artifact_recomputed_hash or ev.hash_after,
             "declared_status": ev.declared_status,
+            "status": "VERIFIED" if is_step_verified else ("BROKEN" if not chain_broken_already or (broken_step_order == ev.sequence_number) else "DOWNSTREAM"),
             "verified": is_step_verified,
             "downstream_of_break": chain_broken_already and (broken_step_order != ev.sequence_number),
             "signature_valid": sig_valid,
             "ledger_link_valid": ledger_valid,
+            "artifact_continuity_valid": artifact_continuity_valid,
             "event_hash": ev.event_hash,
             "signature_preview": f"{ev.signature[:16]}...{ev.signature[-8:]}",
             "errors": step_errors,
@@ -144,16 +177,35 @@ def verify_evidence_integrity(db: Session, evidence_id: int, auditor_name: str =
 
         expected_prev_hash = ev.event_hash
         previous_content_hash = ev.hash_after
+        previous_output_artifact_id = ev.output_artifact_id
+
+    # Construct authoritative first_break dictionary
+    first_break = None
+    broken_handler_id = None
+    if broken_step_order is not None:
+        broken_step_info = next((s for s in step_results if s["step_order"] == broken_step_order), None)
+        handler_name = broken_step_info["handler_name"] if broken_step_info else f"Step {broken_step_order}"
+        handler_row = db.query(models.Handler).filter(models.Handler.name == handler_name).first()
+        broken_handler_id = handler_row.id if handler_row else broken_step_order
+
+        first_break = {
+            "step_order": broken_step_order,
+            "handler_id": broken_handler_id,
+            "handler_name": handler_name,
+            "reason": broken_step_reason or "STORAGE_HASH_MISMATCH",
+        }
 
     # Update evidence overall status
     evidence.status = "VERIFIED" if final_verdict == "CHAIN_INTACT" else "BROKEN"
     db.commit()
 
-    # Persist verification result
+    # Persist verification result with both handler ID and step order
     result = models.VerificationResult(
         evidence_id=evidence_id,
         final_verdict=final_verdict,
-        broken_step_id=broken_step_order,
+        broken_step_order=broken_step_order,
+        broken_handler_id=broken_handler_id,
+        broken_step_id=broken_handler_id,
     )
     db.add(result)
     db.commit()
@@ -161,10 +213,10 @@ def verify_evidence_integrity(db: Session, evidence_id: int, auditor_name: str =
     log_audit_event(
         db,
         user_name=auditor_name,
-        action="EVIDENCE_VERIFIED",
+        action="VERIFY_EVIDENCE",
         resource_type="EVIDENCE",
         resource_id=str(evidence_id),
-        details=f"Verification result: {final_verdict}",
+        details=f"Verification verdict: {final_verdict}",
     )
 
     return {
@@ -174,6 +226,9 @@ def verify_evidence_integrity(db: Session, evidence_id: int, auditor_name: str =
         "evidence_name": evidence.name,
         "original_hash": evidence.original_hash,
         "final_verdict": final_verdict,
+        "broken_step_order": broken_step_order,
+        "broken_handler_id": broken_handler_id,
         "broken_step_id": broken_step_order,
+        "first_break": first_break,
         "steps": step_results,
     }

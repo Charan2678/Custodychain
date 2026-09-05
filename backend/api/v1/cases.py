@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 import models
-from security.auth import get_current_user
+from security.auth import get_current_user, require_role
 from services.audit_service import log_audit_event
 
 router = APIRouter(prefix="/cases", tags=["Forensic Cases"])
@@ -38,7 +38,7 @@ def list_cases(db: Session = Depends(get_db)):
 @router.post("")
 def create_case(
     payload: CaseCreateRequest,
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(require_role(["EVIDENCE_OFFICER", "SYSTEM_ADMIN"])),
     db: Session = Depends(get_db),
 ):
     existing = db.query(models.Case).filter(models.Case.case_number == payload.case_number).first()
@@ -64,7 +64,15 @@ def create_case(
         details=f"Case {new_case.case_number}: {new_case.title}",
     )
 
-    return new_case
+    return {
+        "id": new_case.id,
+        "case_number": new_case.case_number,
+        "title": new_case.title,
+        "description": new_case.description,
+        "status": new_case.status,
+        "created_by": new_case.created_by,
+        "created_at": new_case.created_at.isoformat() if new_case.created_at else None,
+    }
 
 
 @router.get("/{case_id}")

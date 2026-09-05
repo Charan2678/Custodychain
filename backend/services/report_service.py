@@ -99,8 +99,8 @@ def generate_forensic_certificate_pdf(db: Session, evidence_id: int) -> bytes:
     elements = []
 
     # Title & Certification Header
-    elements.append(Paragraph("FORENSIC CHAIN OF CUSTODY CERTIFICATE", header_style))
-    elements.append(Paragraph("CustodyChain Digital Evidence Verification System &middot; Cryptographic Attestation", sub_header))
+    elements.append(Paragraph("EVIDENCE INTEGRITY REPORT", header_style))
+    elements.append(Paragraph("Chain of Custody Verification &middot; Automated Cryptographic Attestation", sub_header))
     elements.append(Spacer(1, 12))
     elements.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor("#0284c7"), spaceAfter=15))
 

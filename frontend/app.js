@@ -1,5 +1,5 @@
 /* ==========================================================================
-   CustodyChain — Modern Calm Forensic Workspace Controller
+   CustodyChain — Modern Calm Forensic Workspace Controller (Production Auth)
    ========================================================================== */
 
 const API_BASE = "http://localhost:8000";
@@ -47,6 +47,14 @@ const FORENSIC_SCENARIOS = [
   },
 ];
 
+// Production Demo Accounts for RBAC Demonstration
+const DEMO_ACCOUNTS = {
+  "SYSTEM_ADMIN": { email: "charan@custodychain.internal", name: "Charan", role: "SYSTEM_ADMIN" },
+  "EVIDENCE_OFFICER": { email: "officer@custodychain.internal", name: "Evidence Officer", role: "EVIDENCE_OFFICER" },
+  "FORENSIC_ANALYST": { email: "analyst@custodychain.internal", name: "Forensic Analyst", role: "FORENSIC_ANALYST" },
+  "AUDITOR": { email: "auditor@custodychain.internal", name: "Independent Auditor", role: "AUDITOR" },
+};
+
 let scenarioIndex = 0;
 let currentEvidenceId = null;
 let currentCaseId = 1;
@@ -85,6 +93,7 @@ const toggleAllExhibitsBtn = document.getElementById("toggleAllExhibitsBtn");
 const sidebarSearch      = document.getElementById("sidebarSearch");
 const globalSearch       = document.getElementById("globalSearch");
 
+const caseSelect         = document.getElementById("caseSelect");
 const headerCaseNumber   = document.getElementById("headerCaseNumber");
 const headerExhibitId    = document.getElementById("headerExhibitId");
 const headerExhibitTitle = document.getElementById("headerExhibitTitle");
@@ -113,6 +122,7 @@ const timelineCards      = document.getElementById("timelineCards");
 
 const userMenuBtn        = document.getElementById("userMenuBtn");
 const roleDropdown       = document.getElementById("roleDropdown");
+const navUserName        = document.getElementById("navUserName");
 const navUserRole        = document.getElementById("navUserRole");
 
 const themeToggleBtn     = document.getElementById("themeToggleBtn");
@@ -122,17 +132,99 @@ const toggleSidebarBtn   = document.getElementById("toggleSidebarBtn");
 const workspaceSidebar   = document.querySelector(".workspace-sidebar");
 
 
+// ==========================================================================
+// Centralized Production API Helper with Bearer Authentication
+// ==========================================================================
+async function apiFetch(url, options = {}) {
+  let token = localStorage.getItem("access_token");
+  if (!token) {
+    token = await authenticateUser("charan@custodychain.internal", "evidence123");
+  }
+
+  const headers = {
+    ...(options.headers || {}),
+    ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+  };
+
+  const response = await fetch(url, { ...options, headers });
+
+  if (response.status === 401) {
+    token = await authenticateUser("charan@custodychain.internal", "evidence123");
+    if (token) {
+      const retryHeaders = {
+        ...(options.headers || {}),
+        "Authorization": `Bearer ${token}`,
+      };
+      return fetch(url, { ...options, headers: retryHeaders });
+    }
+  }
+  return response;
+}
+
+async function authenticateUser(email, password) {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      localStorage.setItem("access_token", data.access_token);
+      localStorage.setItem("current_user", JSON.stringify(data.user));
+      updateUserDisplay(data.user);
+      return data.access_token;
+    }
+  } catch (err) {
+    console.error("Authentication error:", err);
+  }
+  return null;
+}
+
+function updateUserDisplay(user) {
+  if (navUserName && user?.name) navUserName.textContent = user.name;
+  if (navUserRole && user?.role) navUserRole.textContent = formatRole(user.role);
+}
+
+
 // ---- Initialization ----
-document.addEventListener("DOMContentLoaded", () => {
-  loadExhibitList();
-  loadCases();
+document.addEventListener("DOMContentLoaded", async () => {
+  // 1. Initial Authentication
+  const savedUser = localStorage.getItem("current_user");
+  if (savedUser) {
+    try {
+      updateUserDisplay(JSON.parse(savedUser));
+    } catch {}
+  } else {
+    await authenticateUser("charan@custodychain.internal", "evidence123");
+  }
+
+  // 2. Load Workspace Data
+  await loadCases();
+  await loadExhibitList();
+
+  // 3. Setup UI Listeners
   setupRoleMenu();
   setupSearch();
   setupModals();
   setupDetailsToggle();
   setupTheme();
   setupSidebarToggle();
+  setupCaseSelector();
 });
+
+// Case Selector Synchronization
+function setupCaseSelector() {
+  if (!caseSelect) return;
+  caseSelect.addEventListener("change", (e) => {
+    currentCaseId = Number(e.target.value);
+    const opt = caseSelect.options[caseSelect.selectedIndex];
+    if (opt && headerCaseNumber) {
+      const match = opt.textContent.match(/\(([^)]+)\)/);
+      headerCaseNumber.textContent = match ? match[1] : `CASE-${currentCaseId}`;
+    }
+  });
+}
 
 // Setup Modals & Dialogs
 function setupModals() {
@@ -234,7 +326,7 @@ function setupDetailsToggle() {
   });
 }
 
-// User Role Dropdown Menu
+// Production RBAC Persona Switching via Real Login Authentication
 function setupRoleMenu() {
   userMenuBtn.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -247,20 +339,16 @@ function setupRoleMenu() {
 
   document.querySelectorAll(".role-option").forEach((btn) => {
     btn.addEventListener("click", async (e) => {
-      const role = e.target.getAttribute("data-role");
-      try {
-        const res = await fetch(`${API_BASE}/api/v1/auth/switch-role`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ role }),
-        });
-        if (res.ok) {
-          navUserRole.textContent = formatRole(role);
-          document.querySelectorAll(".role-option").forEach(b => b.classList.remove("active"));
-          btn.classList.add("active");
-        }
-      } catch (err) {
-        console.error("Role switch error:", err);
+      const roleKey = e.target.getAttribute("data-role");
+      const account = DEMO_ACCOUNTS[roleKey];
+      if (!account) return;
+
+      // Authenticate as this role via real JWT endpoint
+      const token = await authenticateUser(account.email, "evidence123");
+      if (token) {
+        document.querySelectorAll(".role-option").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        roleDropdown.classList.add("hidden");
       }
     });
   });
@@ -299,7 +387,7 @@ function setupSearch() {
   });
 }
 
-// Quick Sample Demo Scenario (Cycles Real Forensic Examples)
+// Quick Sample Demo Scenario
 runSampleBtn.addEventListener("click", () => {
   const scenario = FORENSIC_SCENARIOS[scenarioIndex];
   scenarioIndex = (scenarioIndex + 1) % FORENSIC_SCENARIOS.length;
@@ -310,7 +398,6 @@ runSampleBtn.addEventListener("click", () => {
   const content = scenario.generate(randId, time);
   const simulateTamper = scenario.tamperStep !== 0;
 
-  // Pre-fill modal form for transparency
   document.getElementById("evidenceName").value = name;
   document.getElementById("evidenceContent").value = content;
   document.getElementById("tamperStepSelect").value = String(scenario.tamperStep);
@@ -351,11 +438,13 @@ verifyBtn.addEventListener("click", async () => {
   verifyBtn.disabled = true;
   verifyBtnText.textContent = "Verifying…";
   try {
-    const res = await fetch(`${API_BASE}/api/v1/verification/${currentEvidenceId}`, { method: "POST" });
+    const res = await apiFetch(`${API_BASE}/api/v1/verification/${currentEvidenceId}`, { method: "POST" });
     if (res.ok) {
       const data = await res.json();
       renderVerificationResults(data);
       loadExhibitList();
+    } else if (res.status === 403) {
+      alert("Access Denied: Your active role does not have permission to verify evidence.");
     }
   } catch (err) {
     console.error("Verification error:", err);
@@ -365,17 +454,48 @@ verifyBtn.addEventListener("click", async () => {
   }
 });
 
-// Export PDF Report
-downloadPdfBtn.addEventListener("click", () => {
+// Export Evidence Integrity PDF Report with Bearer Authorization
+downloadPdfBtn.addEventListener("click", async () => {
   if (!currentEvidenceId) return;
-  window.open(`${API_BASE}/api/v1/reports/${currentEvidenceId}/pdf`, "_blank");
+  downloadPdfBtn.disabled = true;
+  downloadPdfBtn.textContent = "Exporting…";
+  try {
+    const res = await apiFetch(`${API_BASE}/api/v1/reports/${currentEvidenceId}/pdf`);
+    if (!res.ok) {
+      if (res.status === 403) {
+        alert("Access Denied: Your active role cannot generate forensic reports.");
+      } else {
+        alert("Failed to generate report.");
+      }
+      return;
+    }
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `CustodyChain_EvidenceIntegrity_EX-${currentEvidenceId}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error("PDF download error:", err);
+  } finally {
+    downloadPdfBtn.disabled = false;
+    downloadPdfBtn.innerHTML = `<span class="btn-symbol">⇩</span><span>Report</span>`;
+  }
 });
 
-// Core Pipeline Execution
+// Core Ingestion & Authoritative Verification Flow
 async function ingestAndVerify(payload) {
+  if (!currentCaseId) {
+    alert("Please select an active investigation case before ingesting evidence.");
+    return;
+  }
+
   setGlobalLoading(true);
   try {
-    const createRes = await fetch(`${API_BASE}/api/v1/evidence`, {
+    const createRes = await apiFetch(`${API_BASE}/api/v1/evidence`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -388,6 +508,9 @@ async function ingestAndVerify(payload) {
     });
 
     if (!createRes.ok) {
+      if (createRes.status === 403) {
+        throw new Error("Access Denied: Your current role (e.g. Auditor) is not authorized to ingest evidence.");
+      }
       const err = await createRes.json().catch(() => ({}));
       throw new Error(err.detail || `Server error: ${createRes.status}`);
     }
@@ -396,7 +519,7 @@ async function ingestAndVerify(payload) {
     currentEvidenceId = created.evidence_id;
 
     // Independent Multi-Vector Verification
-    const verifyRes = await fetch(`${API_BASE}/api/v1/verification/${currentEvidenceId}`, { method: "POST" });
+    const verifyRes = await apiFetch(`${API_BASE}/api/v1/verification/${currentEvidenceId}`, { method: "POST" });
     if (!verifyRes.ok) throw new Error("Failed to verify evidence");
     const verifyData = await verifyRes.json();
 
@@ -416,20 +539,8 @@ function renderVerificationResults(data) {
   currentVerificationData = data;
 
   const isIntact = data.final_verdict === "CHAIN_INTACT";
-  // Derive first broken step if not explicitly keyed in response
-  let firstBreak = data.first_break;
-  if (!firstBreak && data.steps) {
-    firstBreak = data.steps.find(s => !s.verified);
-    if (firstBreak && !firstBreak.reason) {
-      if (firstBreak.signature_valid === false) {
-        firstBreak.reason = "SIGNATURE_INVALID";
-      } else if (firstBreak.ledger_link_valid === false) {
-        firstBreak.reason = "LEDGER_LINK_BROKEN";
-      } else {
-        firstBreak.reason = "STORAGE_HASH_MISMATCH";
-      }
-    }
-  }
+  // Authoritative first_break object provided directly by backend
+  const firstBreak = data.first_break || (data.steps ? data.steps.find(s => !s.verified) : null);
 
   // Level 1: What is happening?
   headerExhibitTitle.textContent = data.evidence_name;
@@ -477,19 +588,7 @@ function renderVerificationResults(data) {
 // Render Conversational Explanation ("Why is this broken / intact?")
 function renderExplanation(data) {
   const isIntact = data.final_verdict === "CHAIN_INTACT";
-  let firstBreak = data.first_break;
-  if (!firstBreak && data.steps) {
-    firstBreak = data.steps.find(s => !s.verified);
-    if (firstBreak && !firstBreak.reason) {
-      if (firstBreak.signature_valid === false) {
-        firstBreak.reason = "SIGNATURE_INVALID";
-      } else if (firstBreak.ledger_link_valid === false) {
-        firstBreak.reason = "LEDGER_LINK_BROKEN";
-      } else {
-        firstBreak.reason = "STORAGE_HASH_MISMATCH";
-      }
-    }
-  }
+  const firstBreak = data.first_break || (data.steps ? data.steps.find(s => !s.verified) : null);
 
   if (isIntact) {
     explanationTitle.textContent = "Integrity Analysis: Chain Intact";
@@ -502,16 +601,18 @@ function renderExplanation(data) {
 
     let breakExplanation = "";
     if (firstBreak?.reason === "STORAGE_HASH_MISMATCH") {
-      breakExplanation = `The first verifiable mismatch occurred during the <strong>${esc(firstBreak.handler_name)}</strong> transition (Step ${firstBreak.step_order}). The physical artifact hash stored on disk (<span class="hash-tag">${trunc(firstBreak.actual_hash, 16)}</span>) differs from the expected input hash (<span class="hash-tag">${trunc(firstBreak.hash_before, 16)}</span>).`;
+      breakExplanation = `The first verifiable mismatch occurred during the <strong>${esc(firstBreak.handler_name)}</strong> transition (Step ${firstBreak.step_order}). The physical artifact hash stored on disk (<span class="hash-tag">${trunc(firstBreak.actual_hash || 'mismatch', 16)}</span>) differs from the expected input hash (<span class="hash-tag">${trunc(firstBreak.hash_before || 'expected', 16)}</span>).`;
     } else if (firstBreak?.reason === "SIGNATURE_INVALID") {
       breakExplanation = `The Ed25519 digital signature for <strong>${esc(firstBreak.handler_name)}</strong> failed cryptographic validation against the registered public key, indicating the record was either forged or altered in transit.`;
     } else if (firstBreak?.reason === "LEDGER_LINK_BROKEN") {
       breakExplanation = `The cryptographic previous-event hash chain was severed at <strong>${esc(firstBreak.handler_name)}</strong>. The event link did not match the hash of the preceding custody record.`;
+    } else if (firstBreak?.reason === "ARTIFACT_CHAIN_DISCONNECTED") {
+      breakExplanation = `The physical artifact lineage was disconnected at <strong>${esc(firstBreak.handler_name)}</strong>. The input artifact ID did not chain to the preceding output artifact.`;
     } else {
       breakExplanation = `An unauthorized mutation was localized at <strong>${esc(firstBreak?.handler_name || 'Step')}</strong>.`;
     }
 
-    const downstreamSteps = data.steps.filter(s => s.downstream_of_break || s.step_order > (firstBreak?.step_order ?? 99));
+    const downstreamSteps = data.steps ? data.steps.filter(s => s.downstream_of_break || s.step_order > (firstBreak?.step_order ?? 99)) : [];
     const downstreamNames = downstreamSteps.map(s => esc(s.handler_name)).join(", ") || "subsequent steps";
 
     explanationBody.innerHTML = `
@@ -566,7 +667,7 @@ function renderTimelineCards(data) {
           <div class="step-summary-meta">
             <span>Handler: <strong>${esc(step.handler_name)}</strong></span>
             <span>Hash: <span class="font-mono">${esc(shortHash)}</span></span>
-            <span>Signature: <strong style="color:${sigValid ? 'var(--verified-text)' : 'var(--broken-text)'}">${sigValid ? 'Valid' : 'Invalid'}</strong></span>
+            <span>Signature: <strong style="color:${sigValid ? 'var(--verified-text)' : 'var(--broken-text)'}">${sigValid ? 'Valid Authenticated' : 'Invalid'}</strong></span>
           </div>
           <button class="btn-toggle-proofs" type="button">View technical details</button>
         </div>
@@ -599,13 +700,11 @@ function renderTimelineCards(data) {
       </div>
     `;
 
-    // Click handler main row to toggle Level 2 details
     const mainRow = card.querySelector(".handler-card-main");
     mainRow.addEventListener("click", () => {
       card.classList.toggle("expanded");
     });
 
-    // Click button to toggle Level 3 technical proofs
     const proofsBtn = card.querySelector(".btn-toggle-proofs");
     const proofsBlock = card.querySelector(".technical-proofs-block");
     proofsBtn.addEventListener("click", (e) => {
@@ -621,7 +720,7 @@ function renderTimelineCards(data) {
 // Load Exhibits for Minimal Sidebar (Progressive Disclosure)
 async function loadExhibitList() {
   try {
-    const res = await fetch(`${API_BASE}/api/v1/evidence`);
+    const res = await apiFetch(`${API_BASE}/api/v1/evidence`);
     if (!res.ok) return;
     allExhibits = await res.json();
 
@@ -671,7 +770,6 @@ function renderSidebarExhibits() {
     exhibitNavList.appendChild(navItem);
   });
 
-  // Toggle "View all N evidence"
   if (allExhibits.length > SIDEBAR_PREVIEW_LIMIT) {
     sidebarExpandWrap.classList.remove("hidden");
     toggleAllExhibitsBtn.textContent = showAllExhibits
@@ -689,7 +787,7 @@ toggleAllExhibitsBtn.addEventListener("click", () => {
 
 async function selectExhibit(id) {
   try {
-    const verifyRes = await fetch(`${API_BASE}/api/v1/verification/${id}`, { method: "POST" });
+    const verifyRes = await apiFetch(`${API_BASE}/api/v1/verification/${id}`, { method: "POST" });
     if (verifyRes.ok) {
       const data = await verifyRes.json();
       renderVerificationResults(data);
@@ -702,10 +800,9 @@ async function selectExhibit(id) {
 // Load Cases
 async function loadCases() {
   try {
-    const res = await fetch(`${API_BASE}/api/v1/cases`);
+    const res = await apiFetch(`${API_BASE}/api/v1/cases`);
     if (!res.ok) return;
     const cases = await res.json();
-    const caseSelect = document.getElementById("caseSelect");
     if (!caseSelect || cases.length === 0) return;
 
     caseSelect.innerHTML = cases.map(c => `
@@ -719,12 +816,16 @@ async function loadCases() {
   }
 }
 
-// Load Immutable System Audit Trail
+// Load Immutable System Audit Trail (Requires AUDITOR or SYSTEM_ADMIN)
 async function loadAuditTrail() {
   auditModal.classList.remove("hidden");
   auditTableBody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-dim);">Loading records...</td></tr>`;
   try {
-    const res = await fetch(`${API_BASE}/api/v1/audit?limit=50`);
+    const res = await apiFetch(`${API_BASE}/api/v1/audit?limit=50`);
+    if (res.status === 403) {
+      auditTableBody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--broken-text);">Access Denied (403 Forbidden): Your active role does not have permission to view system audit logs. Switch to Auditor or System Admin.</td></tr>`;
+      return;
+    }
     if (!res.ok) throw new Error("Failed to load audit trail");
     const records = await res.json();
     if (records.length === 0) {

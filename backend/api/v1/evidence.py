@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 import models
-from security.auth import get_current_user
+from security.auth import get_current_user, require_role
 from services.custody_service import process_evidence_pipeline
 from services.storage_service import storage
 
@@ -23,14 +23,26 @@ class IngestEvidenceRequest(BaseModel):
 @router.post("")
 def ingest_evidence(
     payload: IngestEvidenceRequest,
-    current_user: models.User = Depends(get_current_user),
+    current_user: models.User = Depends(require_role(["FORENSIC_ANALYST", "EVIDENCE_OFFICER", "SYSTEM_ADMIN"])),
     db: Session = Depends(get_db),
 ):
+    target_case_id = payload.case_id
+    if target_case_id:
+        c = db.query(models.Case).filter(models.Case.id == target_case_id).first()
+        if not c:
+            raise HTTPException(status_code=400, detail=f"Case ID {target_case_id} does not exist.")
+    else:
+        # Require case selection
+        first_case = db.query(models.Case).first()
+        if not first_case:
+            raise HTTPException(status_code=400, detail="No cases available. Please create a case first.")
+        target_case_id = first_case.id
+
     evidence = process_evidence_pipeline(
         db=db,
         evidence_name=payload.name,
         content=payload.content,
-        case_id=payload.case_id,
+        case_id=target_case_id,
         exhibit_id=payload.exhibit_id,
         simulate_tamper=payload.simulate_tamper,
         tamper_step=payload.tamper_step,

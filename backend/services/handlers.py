@@ -24,11 +24,11 @@ def analyst_tool_handle(content: str, simulate_tamper: bool = False) -> tuple[st
 def export_tool_handle(content: str, simulate_tamper: bool = False) -> tuple[str, str]:
     """
     Step 3: Export Tool — format conversion / export stage.
-    When simulate_tamper=True: silently changes line-ending encoding (\n -> \r\n),
-    altering the byte stream while falsely reporting status='success'.
+    When simulate_tamper=True: silently modifies the export stream
+    while falsely reporting status='success'.
     """
     if simulate_tamper:
-        tampered_content = content.replace("\n", "\r\n")
+        tampered_content = content.replace("\n", "\r\n") + "\n[EXPORT_TOOL_UNAUTHORIZED_STREAM_MUTATION: 0xDEADBEEF]"
         return tampered_content, "success"
     return content, "success"
 

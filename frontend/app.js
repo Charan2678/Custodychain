@@ -214,9 +214,23 @@ function renderResults(data, meta) {
 
   // Verdict banner
   const isIntact = data.final_verdict === "CHAIN_INTACT";
-  banner.innerHTML = isIntact
-    ? "Chain intact — evidence verified end to end. This artifact reflects the original exactly."
-    : `${data.final_verdict.replaceAll("_", " ")} — evidence in Archive no longer matches the original artifact collected. Later analysis based on this exhibit cannot be trusted.`;
+  const titleText = isIntact
+    ? "Chain Intact — Integrity Verified"
+    : formatVerdict(data.final_verdict);
+
+  const subtitleText = isIntact
+    ? "All handlers verified independently end-to-end. Evidence in Archive matches original acquisition byte-for-byte."
+    : "Evidence in Archive no longer matches the original artifact collected. Unauthorized modification detected; subsequent forensic findings cannot be trusted.";
+
+  banner.innerHTML = `
+    <div class="verdict-header">
+      <span class="verdict-icon-badge ${isIntact ? "ok" : "broken"}">${isIntact ? "✓" : "✕"}</span>
+      <div class="verdict-text-block">
+        <h3 class="verdict-headline">${escHtml(titleText)}</h3>
+        <p class="verdict-subtext">${escHtml(subtitleText)}</p>
+      </div>
+    </div>
+  `;
   banner.className = "verdict-banner " + (isIntact ? "ok" : "broken");
 
   // Timeline
@@ -225,14 +239,17 @@ function renderResults(data, meta) {
 
   data.steps.forEach((step, index) => {
     let rowClass = "ok";
+    let iconChar = "✓";
     let tag = "";
 
     if (!step.verified) {
       rowClass = "broken";
+      iconChar = "✕";
       brokenSeen = true;
       tag = '<span class="step-tag broken">Tamper detected</span>';
     } else if (brokenSeen) {
       rowClass = "downstream";
+      iconChar = "⚠";
       tag = '<span class="step-tag downstream">Downstream of break</span>';
     }
 
@@ -244,14 +261,16 @@ function renderResults(data, meta) {
     row.style.animationDelay = `${index * 60}ms`;
     row.innerHTML = `
       <div class="step-main">
-        <span class="step-icon ${rowClass}">${step.verified ? "✓" : "✕"}</span>
-        <span class="step-name">
-          ${escHtml(step.step_order + ". " + step.handler_name)}
+        <span class="step-icon ${rowClass}">${iconChar}</span>
+        <div class="step-name">
+          <span class="step-title">${escHtml(step.step_order + ". " + step.handler_name)}</span>
           ${tag}
-        </span>
-        <span class="step-status">Declared: <strong>${escHtml(step.declared_status)}</strong></span>
-        <span class="step-hash">${truncHash(step.actual_hash)}</span>
-        <span class="step-expand">▾</span>
+        </div>
+        <div class="step-meta-right">
+          <span class="step-status">Declared: <strong>${escHtml(step.declared_status)}</strong></span>
+          <span class="step-hash" title="Actual SHA-256">${truncHash(step.actual_hash)}</span>
+          <span class="step-expand">▾</span>
+        </div>
       </div>
       <div class="step-detail">${detail}</div>
     `;
@@ -265,36 +284,40 @@ function renderResults(data, meta) {
   });
 
   resultsSection.classList.remove("hidden");
+
+  // Smoothly reveal results ensuring the banner is at the top of view
+  banner.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
 // ---- Build expandable hash detail ----
 function buildDetail(step, hashMismatch, rowClass) {
-  const afterClass  = hashMismatch ? "hash-value mismatch" : "hash-value match";
   const actualClass = hashMismatch ? "hash-value mismatch" : "hash-value match";
 
   let verdictMsg = "";
   if (step.handler_name === "Collector") {
-    verdictMsg = `<div class="detail-verdict ok">✓ Trusted origin — this is the baseline hash for the chain.</div>`;
-  } else if (step.verified) {
-    verdictMsg = `<div class="detail-verdict ok">✓ Verified — actual hash matches previous step. Evidence unchanged.</div>`;
+    verdictMsg = `<div class="detail-verdict ok">✓ Trusted origin — baseline acquisition hash for the entire custody chain.</div>`;
+  } else if (rowClass === "broken") {
+    verdictMsg = `<div class="detail-verdict fail">✕ Breach Point — unauthorized content alteration detected. Output hash does not match previous handler output.</div>`;
   } else if (rowClass === "downstream") {
-    verdictMsg = `<div class="detail-verdict warn">⚠ Downstream of break — chain already compromised upstream.</div>`;
-  } else {
-    verdictMsg = `<div class="detail-verdict fail">✕ Tamper detected — actual hash does not match input. This step silently altered the evidence despite declaring "success".</div>`;
+    verdictMsg = `<div class="detail-verdict warn">⚠ Downstream of break — this handler did not tamper with evidence, but inherited already-compromised artifact data.</div>`;
+  } else if (step.verified) {
+    verdictMsg = `<div class="detail-verdict ok">✓ Verified — recomputed hash matches previous stage output exactly. No tampering detected.</div>`;
   }
 
   return `
-    <div class="hash-field">
-      <div class="hash-label">Hash before (declared by handler)</div>
-      <div class="hash-value">${escHtml(step.hash_before)}</div>
-    </div>
-    <div class="hash-field">
-      <div class="hash-label">Hash after (declared by handler)</div>
-      <div class="${afterClass}">${escHtml(step.hash_after)}</div>
-    </div>
-    <div class="hash-field">
-      <div class="hash-label">Actual hash (independently recomputed by Verifier)</div>
-      <div class="${actualClass}">${escHtml(step.actual_hash)}</div>
+    <div class="hash-fields-grid">
+      <div class="hash-field">
+        <span class="hash-label">Input Hash (Previous Output)</span>
+        <span class="hash-value">${escHtml(step.hash_before)}</span>
+      </div>
+      <div class="hash-field">
+        <span class="hash-label">Self-Reported Declared Hash</span>
+        <span class="hash-value">${escHtml(step.hash_after)}</span>
+      </div>
+      <div class="hash-field">
+        <span class="hash-label">Independent Verifier Recomputed Hash</span>
+        <span class="${actualClass}">${escHtml(step.actual_hash)}</span>
+      </div>
     </div>
     ${verdictMsg}
   `;
@@ -350,16 +373,26 @@ async function loadHistory() {
 
     items.forEach((item) => {
       const isIntact = item.final_verdict === "CHAIN_INTACT";
+      const verdictLabel = isIntact
+        ? "Verified Intact"
+        : item.final_verdict.replace("CHAIN_BROKEN_AT_", "").replace(/_/g, " ");
+
       const row = document.createElement("div");
       row.className = "history-row";
       row.innerHTML = `
-        <span class="history-name">#${item.evidence_id} — ${escHtml(item.name)}</span>
-        <span class="history-meta">
-          <span>${new Date(item.created_at).toLocaleTimeString()}</span>
-          <span class="history-badge ${isIntact ? "ok" : "broken"}">
-            ${isIntact ? "Intact" : "Broken"}
-          </span>
-        </span>
+        <div class="history-row-main">
+          <div class="history-row-header">
+            <span class="history-id">#${item.evidence_id}</span>
+            <span class="history-name" title="${escHtml(item.name)}">${escHtml(item.name)}</span>
+            <span class="history-badge ${isIntact ? "ok" : "broken"}">
+              ${isIntact ? "INTACT" : "BROKEN"}
+            </span>
+          </div>
+          <div class="history-row-sub">
+            <span class="history-time">${new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+            <span class="history-verdict-summary ${isIntact ? "ok" : "broken"}">${escHtml(verdictLabel)}</span>
+          </div>
+        </div>
       `;
       row.addEventListener("click", async () => {
         try {
@@ -367,7 +400,6 @@ async function loadHistory() {
           if (verifyRes.ok) {
             const verifyData = await verifyRes.json();
             renderResults(verifyData, { name: item.name });
-            resultsSection.scrollIntoView({ behavior: "smooth" });
           }
         } catch (e) {
           console.error("Error loading historical verification:", e);

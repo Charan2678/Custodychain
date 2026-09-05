@@ -83,6 +83,26 @@ def list_evidence(db: Session = Depends(get_db)):
     ]
 
 
+@app.get("/history", summary="List all evidence items with their latest verification verdict")
+def get_history(db: Session = Depends(get_db)):
+    items = db.query(models.Evidence).order_by(models.Evidence.id.desc()).all()
+    results = []
+    for e in items:
+        verdict = (
+            db.query(models.VerificationResult)
+            .filter(models.VerificationResult.evidence_id == e.id)
+            .order_by(models.VerificationResult.id.desc())
+            .first()
+        )
+        results.append({
+            "evidence_id": e.id,
+            "name": e.name,
+            "created_at": e.created_at.isoformat(),
+            "final_verdict": verdict.final_verdict if verdict else "NOT_VERIFIED",
+        })
+    return results
+
+
 @app.get("/evidence/{evidence_id}/custody-log", summary="Get full step-by-step custody log")
 def get_custody_log(evidence_id: int, db: Session = Depends(get_db)):
     logs = (

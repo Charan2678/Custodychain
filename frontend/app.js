@@ -5,11 +5,15 @@
 
 const API_BASE = "http://localhost:8000";
 
-// ---- Sample evidence (pre-loaded for quick demo) ----
-const SAMPLE_EVIDENCE = {
-  name: "Case-2026-0912-Exhibit-A",
-  content: "CASE_FILE_2026_0912\nSuspect device seized at 14:02.\nHash chain begins here.",
-};
+// ---- Dynamic sample generator ----
+function generateSampleEvidence() {
+  const caseId = Math.floor(Math.random() * 9000 + 1000);
+  const seizedTime = new Date().toLocaleTimeString();
+  return {
+    name: `Case-2026-${caseId}-Exhibit-A`,
+    content: `CASE_FILE_2026_${caseId}\nSuspect device seized at ${seizedTime}.\nHash chain begins here.`,
+  };
+}
 
 // ---- Element refs ----
 const runBtn      = document.getElementById("runDemoBtn");
@@ -37,7 +41,10 @@ updateToggleDesc();
 
 // ---- Quick sample demo ----
 sampleBtn.addEventListener("click", () => {
-  runVerification(SAMPLE_EVIDENCE.name, SAMPLE_EVIDENCE.content, tamperToggle.checked);
+  const sample = generateSampleEvidence();
+  document.getElementById("evidenceName").value = sample.name;
+  document.getElementById("evidenceContent").value = sample.content;
+  runVerification(sample.name, sample.content, tamperToggle.checked);
 });
 
 // ---- Manual form ----
@@ -90,6 +97,7 @@ async function runVerification(name, content, simulateTamper) {
 
     // Render
     renderResults(verifyData, { name });
+    loadHistory();
 
   } catch (err) {
     showError(err.message);
@@ -241,3 +249,57 @@ function escHtml(str) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 }
+
+// ---- History loader ----
+async function loadHistory() {
+  try {
+    const res = await fetch(`${API_BASE}/history`);
+    if (!res.ok) return;
+    const items = await res.json();
+
+    const countEl = document.getElementById("historyCount");
+    if (countEl) countEl.textContent = `${items.length} total`;
+
+    const list = document.getElementById("historyList");
+    if (!list) return;
+    list.innerHTML = "";
+
+    if (items.length === 0) {
+      list.innerHTML = '<div class="history-empty">No runs yet — click Run sample demo or Run verification to begin.</div>';
+      return;
+    }
+
+    items.forEach((item) => {
+      const isIntact = item.final_verdict === "CHAIN_INTACT";
+      const row = document.createElement("div");
+      row.className = "history-row";
+      row.innerHTML = `
+        <span class="history-name">#${item.evidence_id} — ${escHtml(item.name)}</span>
+        <span class="history-meta">
+          <span>${new Date(item.created_at).toLocaleTimeString()}</span>
+          <span class="history-badge ${isIntact ? "ok" : "broken"}">
+            ${isIntact ? "Intact" : "Broken"}
+          </span>
+        </span>
+      `;
+      row.addEventListener("click", async () => {
+        try {
+          const verifyRes = await fetch(`${API_BASE}/evidence/${item.evidence_id}/verify`);
+          if (verifyRes.ok) {
+            const verifyData = await verifyRes.json();
+            renderResults(verifyData, { name: item.name });
+            resultsSection.scrollIntoView({ behavior: "smooth" });
+          }
+        } catch (e) {
+          console.error("Error loading historical verification:", e);
+        }
+      });
+      list.appendChild(row);
+    });
+  } catch (err) {
+    console.warn("Failed to load history:", err);
+  }
+}
+
+// Initial load
+loadHistory();

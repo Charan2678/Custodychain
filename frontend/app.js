@@ -47,14 +47,99 @@ const FORENSIC_SCENARIOS = [
   },
 ];
 
-// Production Demo Accounts for RBAC Demonstration
-const DEMO_ACCOUNTS = {
-  "SYSTEM_ADMIN": { email: "charan@custodychain.internal", name: "Charan", role: "SYSTEM_ADMIN" },
-  "EVIDENCE_OFFICER": { email: "officer@custodychain.internal", name: "Evidence Officer", role: "EVIDENCE_OFFICER" },
-  "FORENSIC_ANALYST": { email: "analyst@custodychain.internal", name: "Forensic Analyst", role: "FORENSIC_ANALYST" },
-  "AUDITOR": { email: "auditor@custodychain.internal", name: "Independent Auditor", role: "AUDITOR" },
+// Four-Tier Production RBAC Hierarchy Specification
+const ROLE_HIERARCHY = {
+  "SYSTEM_ADMIN": {
+    level: 4,
+    tier: "LEVEL 4",
+    roleName: "System Admin",
+    fullName: "Charan (Root Admin)",
+    avatar: "A",
+    tagline: "Full Root & Ledger Clearance",
+    summary: "Complete administrative authority across custody chain, case registry, lab ingestion, independent verification, and immutable security audit logs.",
+    email: "charan@custodychain.internal",
+    canCase: true,
+    canIngest: true,
+    canVerify: true,
+    canAudit: true,
+    canSimulate: true,
+    canReport: true,
+    pills: [
+      { text: "✓ Case Registry", allowed: true },
+      { text: "✓ Evidence Intake", allowed: true },
+      { text: "✓ Verification", allowed: true },
+      { text: "✓ Audit Trail", allowed: true },
+    ]
+  },
+  "EVIDENCE_OFFICER": {
+    level: 3,
+    tier: "LEVEL 3",
+    roleName: "Evidence Officer",
+    fullName: "Officer John Vance",
+    avatar: "O",
+    tagline: "Custody Intake & Case Registry",
+    summary: "Authorized for official case registration and evidence intake. Strictly prohibited from inspecting internal audit trails or self-verifying intake.",
+    email: "officer@custodychain.internal",
+    canCase: true,
+    canIngest: true,
+    canVerify: false,
+    canAudit: false,
+    canSimulate: true,
+    canReport: false,
+    pills: [
+      { text: "✓ Case Registry", allowed: true },
+      { text: "✓ Evidence Intake", allowed: true },
+      { text: "🔒 Verify (Locked)", allowed: false, reason: "Self-verification prohibited by court forensic standard" },
+      { text: "🔒 Audit Trail (Locked)", allowed: false, reason: "Audit trail restricted to Auditors and Admins" },
+    ]
+  },
+  "FORENSIC_ANALYST": {
+    level: 2,
+    tier: "LEVEL 2",
+    roleName: "Forensic Analyst",
+    fullName: "Dr. Elena Rostova",
+    avatar: "F",
+    tagline: "Laboratory Analysis & Verification",
+    summary: "Authorized for forensic laboratory analysis, cryptographic recomputations, Ed25519 signature validation, and court report generation. Prohibited from registering legal cases.",
+    email: "analyst@custodychain.internal",
+    canCase: false,
+    canIngest: true,
+    canVerify: true,
+    canAudit: false,
+    canSimulate: true,
+    canReport: true,
+    pills: [
+      { text: "🔒 Case Registry (Locked)", allowed: false, reason: "Case creation restricted to Evidence Officers and Admins" },
+      { text: "✓ Lab Ingestion", allowed: true },
+      { text: "✓ Verification", allowed: true },
+      { text: "🔒 Audit Trail (Locked)", allowed: false, reason: "Audit trail restricted to Auditors and Admins" },
+    ]
+  },
+  "AUDITOR": {
+    level: 1,
+    tier: "LEVEL 1",
+    roleName: "Independent Auditor",
+    fullName: "Sarah Chen (Auditor)",
+    avatar: "I",
+    tagline: "Regulatory Oversight (Read-Only)",
+    summary: "Strict read-only regulatory oversight. Authorized to inspect immutable audit trails, verify cryptographic hash links, and validate certificates. Evidence creation strictly forbidden.",
+    email: "auditor@custodychain.internal",
+    canCase: false,
+    canIngest: false,
+    canVerify: true,
+    canAudit: true,
+    canSimulate: false,
+    canReport: true,
+    pills: [
+      { text: "🔒 Case Registry (Locked)", allowed: false, reason: "Case creation restricted to Evidence Officers and Admins" },
+      { text: "🔒 Ingestion (Forbidden)", allowed: false, reason: "Auditor must remain independent; cannot contaminate evidence chain" },
+      { text: "✓ Verification", allowed: true },
+      { text: "✓ Audit Trail", allowed: true },
+    ]
+  },
 };
 
+let currentActiveRole = "SYSTEM_ADMIN";
 let scenarioIndex = 0;
 let currentEvidenceId = null;
 let currentCaseId = 1;
@@ -64,72 +149,97 @@ let showAllExhibits = false;
 const SIDEBAR_PREVIEW_LIMIT = 5;
 
 // DOM Elements
-const runSampleBtn       = document.getElementById("runSampleBtn");
-const newEvidenceBtn     = document.getElementById("newEvidenceBtn");
-const openAuditBtn       = document.getElementById("openAuditBtn");
-const closeAuditModalBtn = document.getElementById("closeAuditModalBtn");
-const auditModal         = document.getElementById("auditModal");
-const auditTableBody     = document.getElementById("auditTableBody");
+const newCaseBtn          = document.getElementById("newCaseBtn");
+const newCaseBtnLabel     = document.getElementById("newCaseBtnLabel");
+const runSampleBtn        = document.getElementById("runSampleBtn");
+const runSampleBtnLabel   = document.getElementById("runSampleBtnLabel");
+const newEvidenceBtn      = document.getElementById("newEvidenceBtn");
+const newEvidenceBtnLabel = document.getElementById("newEvidenceBtnLabel");
+const openAuditBtn        = document.getElementById("openAuditBtn");
+const openAuditBtnLabel   = document.getElementById("openAuditBtnLabel");
 
-const scenarioModal      = document.getElementById("scenarioModal");
-const toggleSimulatorBtn = document.getElementById("toggleSimulatorBtn");
-const closeDrawerBtn     = document.getElementById("closeDrawerBtn");
-const cancelModalBtn     = document.getElementById("cancelModalBtn");
-const runCustomBtn       = document.getElementById("runCustomBtn");
+const closeAuditModalBtn  = document.getElementById("closeAuditModalBtn");
+const auditModal          = document.getElementById("auditModal");
+const auditTableBody      = document.getElementById("auditTableBody");
+const verifyAuditLedgerBtn= document.getElementById("verifyAuditLedgerBtn");
+const auditVerifyStatus   = document.getElementById("auditVerifyStatus");
 
-const howVerifiedBtn     = document.getElementById("howVerifiedBtn");
-const howVerifiedModal   = document.getElementById("howVerifiedModal");
-const closeHowVerifiedBtn= document.getElementById("closeHowVerifiedBtn");
+const newCaseModal        = document.getElementById("newCaseModal");
+const closeNewCaseModalBtn= document.getElementById("closeNewCaseModalBtn");
+const cancelNewCaseBtn    = document.getElementById("cancelNewCaseBtn");
+const newCaseForm         = document.getElementById("newCaseForm");
 
-const verifyBtn          = document.getElementById("verifyBtn");
-const verifyBtnText      = document.getElementById("verifyBtnText");
-const explainBtn         = document.getElementById("explainBtn");
-const downloadPdfBtn     = document.getElementById("downloadPdfBtn");
+const scenarioModal       = document.getElementById("scenarioModal");
+const toggleSimulatorBtn  = document.getElementById("toggleSimulatorBtn");
+const closeDrawerBtn      = document.getElementById("closeDrawerBtn");
+const cancelModalBtn      = document.getElementById("cancelModalBtn");
+const runCustomBtn        = document.getElementById("runCustomBtn");
 
-const exhibitNavList     = document.getElementById("exhibitNavList");
-const sidebarExhibitCount= document.getElementById("sidebarExhibitCount");
-const sidebarExpandWrap  = document.getElementById("sidebarExpandWrap");
-const toggleAllExhibitsBtn = document.getElementById("toggleAllExhibitsBtn");
-const sidebarSearch      = document.getElementById("sidebarSearch");
-const globalSearch       = document.getElementById("globalSearch");
+const howVerifiedBtn      = document.getElementById("howVerifiedBtn");
+const howVerifiedModal    = document.getElementById("howVerifiedModal");
+const closeHowVerifiedBtn = document.getElementById("closeHowVerifiedBtn");
 
-const caseSelect         = document.getElementById("caseSelect");
-const headerCaseNumber   = document.getElementById("headerCaseNumber");
-const headerExhibitId    = document.getElementById("headerExhibitId");
-const headerExhibitTitle = document.getElementById("headerExhibitTitle");
-const headerStatusTag    = document.getElementById("headerStatusTag");
+const verifyBtn           = document.getElementById("verifyBtn");
+const verifyBtnText       = document.getElementById("verifyBtnText");
+const explainBtn          = document.getElementById("explainBtn");
+const downloadPdfBtn      = document.getElementById("downloadPdfBtn");
 
-const toggleDetailsBtn   = document.getElementById("toggleDetailsBtn");
-const detailsChevron     = document.getElementById("detailsChevron");
-const detailsContent     = document.getElementById("detailsContent");
-const detailsPreview     = document.getElementById("detailsPreview");
-const metaTimestamp      = document.getElementById("metaTimestamp");
-const metaCustodian      = document.getElementById("metaCustodian");
-const metaHash           = document.getElementById("metaHash");
+const exhibitNavList      = document.getElementById("exhibitNavList");
+const sidebarExhibitCount = document.getElementById("sidebarExhibitCount");
+const sidebarExpandWrap   = document.getElementById("sidebarExpandWrap");
+const toggleAllExhibitsBtn= document.getElementById("toggleAllExhibitsBtn");
+const sidebarSearch       = document.getElementById("sidebarSearch");
+const globalSearch        = document.getElementById("globalSearch");
 
-const verdictBanner      = document.getElementById("verdictBanner");
-const verdictTitle       = document.getElementById("verdictTitle");
-const verdictBreakPoint  = document.getElementById("verdictBreakPoint");
-const verdictExplanation = document.getElementById("verdictExplanation");
-const verdictExplainBtn  = document.getElementById("verdictExplainBtn");
+const caseSelect          = document.getElementById("caseSelect");
+const headerCaseNumber    = document.getElementById("headerCaseNumber");
+const headerExhibitId     = document.getElementById("headerExhibitId");
+const headerExhibitTitle  = document.getElementById("headerExhibitTitle");
+const headerStatusTag     = document.getElementById("headerStatusTag");
 
-const explanationCard    = document.getElementById("explanationCard");
-const explanationTitle   = document.getElementById("explanationTitle");
-const explanationBody    = document.getElementById("explanationBody");
-const closeExplanationBtn= document.getElementById("closeExplanationBtn");
+const toggleDetailsBtn    = document.getElementById("toggleDetailsBtn");
+const detailsChevron      = document.getElementById("detailsChevron");
+const detailsContent      = document.getElementById("detailsContent");
+const detailsPreview      = document.getElementById("detailsPreview");
+const metaTimestamp       = document.getElementById("metaTimestamp");
+const metaCustodian       = document.getElementById("metaCustodian");
+const metaHash            = document.getElementById("metaHash");
 
-const timelineCards      = document.getElementById("timelineCards");
+const verdictBanner       = document.getElementById("verdictBanner");
+const verdictTitle        = document.getElementById("verdictTitle");
+const verdictBreakPoint   = document.getElementById("verdictBreakPoint");
+const verdictExplanation  = document.getElementById("verdictExplanation");
+const verdictExplainBtn   = document.getElementById("verdictExplainBtn");
 
-const userMenuBtn        = document.getElementById("userMenuBtn");
-const roleDropdown       = document.getElementById("roleDropdown");
-const navUserName        = document.getElementById("navUserName");
-const navUserRole        = document.getElementById("navUserRole");
+const explanationCard     = document.getElementById("explanationCard");
+const explanationTitle    = document.getElementById("explanationTitle");
+const explanationBody     = document.getElementById("explanationBody");
+const closeExplanationBtn = document.getElementById("closeExplanationBtn");
 
-const themeToggleBtn     = document.getElementById("themeToggleBtn");
-const themeIcon          = document.getElementById("themeIcon");
-const themeLabel         = document.getElementById("themeLabel");
-const toggleSidebarBtn   = document.getElementById("toggleSidebarBtn");
-const workspaceSidebar   = document.querySelector(".workspace-sidebar");
+const timelineCards       = document.getElementById("timelineCards");
+
+const userMenuBtn         = document.getElementById("userMenuBtn");
+const roleDropdown        = document.getElementById("roleDropdown");
+const navUserAvatar       = document.getElementById("navUserAvatar");
+const navClearanceTag     = document.getElementById("navClearanceTag");
+const navUserName         = document.getElementById("navUserName");
+const navUserRole         = document.getElementById("navUserRole");
+
+const roleClearanceCard   = document.getElementById("roleClearanceCard");
+const clearanceLevelTag   = document.getElementById("clearanceLevelTag");
+const clearanceTitle      = document.getElementById("clearanceTitle");
+const clearanceSummary    = document.getElementById("clearanceSummary");
+const clearanceMatrix     = document.getElementById("clearanceMatrix");
+
+const securityToast       = document.getElementById("securityToast");
+const toastTitle          = document.getElementById("toastTitle");
+const toastMsg            = document.getElementById("toastMsg");
+
+const themeToggleBtn      = document.getElementById("themeToggleBtn");
+const themeIcon           = document.getElementById("themeIcon");
+const themeLabel          = document.getElementById("themeLabel");
+const toggleSidebarBtn    = document.getElementById("toggleSidebarBtn");
+const workspaceSidebar    = document.querySelector(".workspace-sidebar");
 
 
 // ==========================================================================
@@ -182,21 +292,161 @@ async function authenticateUser(email, password) {
 }
 
 function updateUserDisplay(user) {
-  if (navUserName && user?.name) navUserName.textContent = user.name;
-  if (navUserRole && user?.role) navUserRole.textContent = formatRole(user.role);
+  if (!user || !user.role) return;
+  applyRoleHierarchy(user.role);
 }
 
+// Global Security Notification Toast
+function showSecurityToast(title, message) {
+  if (!securityToast) return;
+  if (toastTitle) toastTitle.textContent = title;
+  if (toastMsg) toastMsg.textContent = message;
+  securityToast.classList.remove("hidden");
+  clearTimeout(window._toastTimeout);
+  window._toastTimeout = setTimeout(() => {
+    securityToast.classList.add("hidden");
+  }, 4200);
+}
+
+// Active Role & Permission Hierarchy Enforcement
+function applyRoleHierarchy(roleKey) {
+  const meta = ROLE_HIERARCHY[roleKey] || ROLE_HIERARCHY["SYSTEM_ADMIN"];
+  currentActiveRole = roleKey;
+
+  // 1. Top Navbar Updates
+  if (navUserAvatar) navUserAvatar.textContent = meta.avatar;
+  if (navClearanceTag) navClearanceTag.textContent = meta.tier;
+  if (navUserName) navUserName.textContent = meta.fullName;
+  if (navUserRole) navUserRole.textContent = `${meta.roleName} · ${meta.tagline}`;
+
+  // 2. Role Dropdown Active Indicator
+  document.querySelectorAll(".role-option").forEach(btn => {
+    const r = btn.getAttribute("data-role");
+    if (r === roleKey) {
+      btn.classList.add("active");
+    } else {
+      btn.classList.remove("active");
+    }
+  });
+
+  // 3. Sidebar Role Clearance Card
+  if (clearanceLevelTag) clearanceLevelTag.textContent = meta.tier;
+  if (clearanceTitle) clearanceTitle.textContent = meta.roleName;
+  if (clearanceSummary) clearanceSummary.textContent = meta.summary;
+  if (clearanceMatrix) {
+    clearanceMatrix.innerHTML = meta.pills.map(p => `
+      <span class="perm-pill ${p.allowed ? 'allowed' : 'locked'}" title="${esc(p.reason || (p.allowed ? 'Clearance active' : 'Restricted for role'))}">
+        ${esc(p.text)}
+      </span>
+    `).join("");
+  }
+
+  // 4. Action Buttons Control & Honest Hierarchy Locks
+
+  // New Case Button
+  if (newCaseBtn) {
+    if (meta.canCase) {
+      newCaseBtn.classList.remove("btn-locked");
+      newCaseBtn.title = "Register new legal case (Level 3/4 Clearance)";
+      if (newCaseBtnLabel) newCaseBtnLabel.textContent = "New Case";
+    } else {
+      newCaseBtn.classList.add("btn-locked");
+      newCaseBtn.title = `🔒 Restricted: Case registration requires Evidence Officer or Admin clearance (Current: ${meta.roleName})`;
+      if (newCaseBtnLabel) newCaseBtnLabel.textContent = "🔒 New Case";
+    }
+  }
+
+  // Quick Ingestion Button
+  if (runSampleBtn) {
+    if (meta.canIngest) {
+      runSampleBtn.classList.remove("btn-locked");
+      runSampleBtn.title = "Cycle through real-world forensic exhibits";
+      if (runSampleBtnLabel) runSampleBtnLabel.textContent = "Quick Ingestion";
+    } else {
+      runSampleBtn.classList.add("btn-locked");
+      runSampleBtn.title = "🔒 Restricted: Auditor has read-only oversight; cannot ingest evidence.";
+      if (runSampleBtnLabel) runSampleBtnLabel.textContent = "🔒 Ingestion (Read-Only)";
+    }
+  }
+
+  // Simulation / Ingestion Button
+  if (newEvidenceBtn) {
+    if (meta.canIngest) {
+      newEvidenceBtn.classList.remove("btn-locked");
+      newEvidenceBtn.title = "Ingest new exhibit artifact or simulate tamper";
+      if (newEvidenceBtnLabel) newEvidenceBtnLabel.textContent = "Simulation / Ingestion";
+    } else {
+      newEvidenceBtn.classList.add("btn-locked");
+      newEvidenceBtn.title = "🔒 Restricted: Auditor cannot ingest or modify evidence.";
+      if (newEvidenceBtnLabel) newEvidenceBtnLabel.textContent = "🔒 Ingestion (Read-Only)";
+    }
+  }
+
+  // Audit Trail Button
+  if (openAuditBtn) {
+    if (meta.canAudit) {
+      openAuditBtn.classList.remove("btn-locked");
+      openAuditBtn.title = "Inspect immutable security audit ledger";
+      if (openAuditBtnLabel) openAuditBtnLabel.textContent = roleKey === "AUDITOR" ? "Audit Trail ★" : "Audit Trail";
+    } else {
+      openAuditBtn.classList.add("btn-locked");
+      openAuditBtn.title = `🔒 Restricted: Audit trail inspection is restricted to Auditor and Admin (Current: ${meta.roleName})`;
+      if (openAuditBtnLabel) openAuditBtnLabel.textContent = "🔒 Audit Trail (Auditor Only)";
+    }
+  }
+
+  // Scenario Button in Canvas Header
+  if (toggleSimulatorBtn) {
+    if (meta.canSimulate) {
+      toggleSimulatorBtn.classList.remove("action-locked");
+      toggleSimulatorBtn.title = "Configure simulated tamper scenario";
+    } else {
+      toggleSimulatorBtn.classList.add("action-locked");
+      toggleSimulatorBtn.title = "🔒 Restricted: Auditor cannot inject simulated tamper scenarios.";
+    }
+  }
+
+  // Verify Button
+  if (verifyBtn) {
+    if (meta.canVerify) {
+      verifyBtn.classList.remove("action-locked");
+      verifyBtn.title = "Execute independent multi-vector verification";
+      if (verifyBtnText) verifyBtnText.textContent = "Verify";
+    } else {
+      verifyBtn.classList.add("action-locked");
+      verifyBtn.title = "🔒 Restricted: Evidence Officers cannot self-verify evidence intake.";
+      if (verifyBtnText) verifyBtnText.textContent = "🔒 Verify (Analyst Only)";
+    }
+  }
+
+  // Report Button
+  if (downloadPdfBtn) {
+    if (meta.canReport) {
+      downloadPdfBtn.classList.remove("action-locked");
+      downloadPdfBtn.title = "Export Court-Admissible Chain-of-Custody Certificate";
+    } else {
+      downloadPdfBtn.classList.add("action-locked");
+      downloadPdfBtn.title = "🔒 Restricted: Report generation restricted to Forensic Analysts, Auditors, and Admins.";
+    }
+  }
+}
 
 // ---- Initialization ----
 document.addEventListener("DOMContentLoaded", async () => {
-  // 1. Initial Authentication
+  // 1. Initial Authentication & Hierarchy Setup
   const savedUser = localStorage.getItem("current_user");
+  let userObj = null;
   if (savedUser) {
     try {
-      updateUserDisplay(JSON.parse(savedUser));
+      userObj = JSON.parse(savedUser);
     } catch {}
+  }
+  
+  if (userObj && userObj.role) {
+    applyRoleHierarchy(userObj.role);
   } else {
     await authenticateUser("charan@custodychain.internal", "evidence123");
+    applyRoleHierarchy("SYSTEM_ADMIN");
   }
 
   // 2. Load Workspace Data
@@ -228,12 +478,95 @@ function setupCaseSelector() {
 
 // Setup Modals & Dialogs
 function setupModals() {
+  // New Case Modal & Submission
+  if (newCaseBtn) {
+    newCaseBtn.addEventListener("click", () => {
+      const meta = ROLE_HIERARCHY[currentActiveRole] || ROLE_HIERARCHY["SYSTEM_ADMIN"];
+      if (!meta.canCase) {
+        showSecurityToast("Permission Denied (Level 3 Required)", `${meta.roleName} lacks case creation clearance. Only Evidence Officers and Admins may register cases.`);
+        return;
+      }
+      if (newCaseModal) {
+        newCaseModal.classList.remove("hidden");
+        const numInput = document.getElementById("newCaseNumber");
+        if (numInput) {
+          numInput.value = `CASE-${new Date().getFullYear()}-${Math.floor(Math.random() * 9000 + 1000)}`;
+          numInput.focus();
+        }
+      }
+    });
+  }
+
+  if (closeNewCaseModalBtn) closeNewCaseModalBtn.addEventListener("click", () => newCaseModal.classList.add("hidden"));
+  if (cancelNewCaseBtn) cancelNewCaseBtn.addEventListener("click", () => newCaseModal.classList.add("hidden"));
+  if (newCaseModal) {
+    newCaseModal.addEventListener("click", (e) => {
+      if (e.target === newCaseModal) newCaseModal.classList.add("hidden");
+    });
+  }
+
+  if (newCaseForm) {
+    newCaseForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const caseNum = document.getElementById("newCaseNumber").value.trim();
+      const title = document.getElementById("newCaseTitle").value.trim();
+      const desc = document.getElementById("newCaseDesc").value.trim();
+      const submitBtn = document.getElementById("submitNewCaseBtn");
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Registering...";
+
+      try {
+        const res = await apiFetch(`${API_BASE}/api/v1/cases`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ case_number: caseNum, title: title, description: desc }),
+        });
+
+        if (res.ok) {
+          const newCase = await res.json();
+          newCaseModal.classList.add("hidden");
+          newCaseForm.reset();
+          await loadCases();
+          if (caseSelect) {
+            caseSelect.value = String(newCase.id);
+            currentCaseId = newCase.id;
+            headerCaseNumber.textContent = newCase.case_number;
+          }
+          showSecurityToast("Case Registered", `Official case ${caseNum} registered into forensic ledger.`);
+        } else {
+          const errData = await res.json().catch(() => ({ detail: "Failed to register case" }));
+          showSecurityToast("Registration Failed", errData.detail || "Unable to register case.");
+        }
+      } catch (err) {
+        showSecurityToast("Network Error", err.message);
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Register Case";
+      }
+    });
+  }
+
   // Scenario / Ingestion Modal
-  toggleSimulatorBtn.addEventListener("click", () => scenarioModal.classList.remove("hidden"));
-  newEvidenceBtn.addEventListener("click", () => {
+  toggleSimulatorBtn.addEventListener("click", () => {
+    const meta = ROLE_HIERARCHY[currentActiveRole] || ROLE_HIERARCHY["SYSTEM_ADMIN"];
+    if (!meta.canSimulate) {
+      showSecurityToast("Action Restricted", `${meta.roleName} cannot inject simulated tamper scenarios.`);
+      return;
+    }
     scenarioModal.classList.remove("hidden");
-    document.getElementById("evidenceName").focus();
   });
+
+  newEvidenceBtn.addEventListener("click", () => {
+    const meta = ROLE_HIERARCHY[currentActiveRole] || ROLE_HIERARCHY["SYSTEM_ADMIN"];
+    if (!meta.canIngest) {
+      showSecurityToast("Action Restricted (Read-Only)", `${meta.roleName} is an independent oversight role and cannot ingest evidence.`);
+      return;
+    }
+    scenarioModal.classList.remove("hidden");
+    const evNameInput = document.getElementById("evidenceName");
+    if (evNameInput) evNameInput.focus();
+  });
+
   closeDrawerBtn.addEventListener("click", () => scenarioModal.classList.add("hidden"));
   cancelModalBtn.addEventListener("click", () => scenarioModal.classList.add("hidden"));
   scenarioModal.addEventListener("click", (e) => {
@@ -247,12 +580,53 @@ function setupModals() {
     if (e.target === howVerifiedModal) howVerifiedModal.classList.add("hidden");
   });
 
-  // Audit Modal
-  openAuditBtn.addEventListener("click", loadAuditTrail);
+  // Audit Modal & Ledger Verification
+  openAuditBtn.addEventListener("click", () => {
+    const meta = ROLE_HIERARCHY[currentActiveRole] || ROLE_HIERARCHY["SYSTEM_ADMIN"];
+    if (!meta.canAudit) {
+      showSecurityToast("Permission Denied (403 Forbidden)", `System Audit Trail is restricted to Auditor and Admin. Current role (${meta.roleName}) lacks VIEW_AUDIT clearance.`);
+      return;
+    }
+    loadAuditTrail();
+  });
+
   closeAuditModalBtn.addEventListener("click", () => auditModal.classList.add("hidden"));
   auditModal.addEventListener("click", (e) => {
     if (e.target === auditModal) auditModal.classList.add("hidden");
   });
+
+  if (verifyAuditLedgerBtn) {
+    verifyAuditLedgerBtn.addEventListener("click", async () => {
+      verifyAuditLedgerBtn.disabled = true;
+      verifyAuditLedgerBtn.textContent = "Checking Hashes...";
+      try {
+        const res = await apiFetch(`${API_BASE}/api/v1/audit/verify`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.status === "VALID" || data.status === "INTACT") {
+            auditVerifyStatus.className = "audit-verify-banner intact";
+            auditVerifyStatus.textContent = `✓ Audit Ledger Intact: ${data.events_checked} records cryptographically verified via unbroken SHA-256 hash continuity.`;
+            auditVerifyStatus.classList.remove("hidden");
+          } else {
+            auditVerifyStatus.className = "audit-verify-banner failed";
+            auditVerifyStatus.textContent = `✕ Break Detected: Record #${data.broken_event_id || 'N/A'} hash mismatch.`;
+            auditVerifyStatus.classList.remove("hidden");
+          }
+        } else {
+          auditVerifyStatus.className = "audit-verify-banner failed";
+          auditVerifyStatus.textContent = `Access Denied: 403 Forbidden.`;
+          auditVerifyStatus.classList.remove("hidden");
+        }
+      } catch (err) {
+        auditVerifyStatus.className = "audit-verify-banner failed";
+        auditVerifyStatus.textContent = `Verification Error: ${err.message}`;
+        auditVerifyStatus.classList.remove("hidden");
+      } finally {
+        verifyAuditLedgerBtn.disabled = false;
+        verifyAuditLedgerBtn.textContent = "Verify Ledger Continuity";
+      }
+    });
+  }
 
   // Conversational Explanation Card
   explainBtn.addEventListener("click", () => {
@@ -339,16 +713,16 @@ function setupRoleMenu() {
 
   document.querySelectorAll(".role-option").forEach((btn) => {
     btn.addEventListener("click", async (e) => {
-      const roleKey = e.target.getAttribute("data-role");
-      const account = DEMO_ACCOUNTS[roleKey];
-      if (!account) return;
+      const roleKey = btn.getAttribute("data-role");
+      const meta = ROLE_HIERARCHY[roleKey];
+      if (!meta) return;
 
       // Authenticate as this role via real JWT endpoint
-      const token = await authenticateUser(account.email, "evidence123");
+      const token = await authenticateUser(meta.email, "evidence123");
       if (token) {
-        document.querySelectorAll(".role-option").forEach(b => b.classList.remove("active"));
-        btn.classList.add("active");
+        applyRoleHierarchy(roleKey);
         roleDropdown.classList.add("hidden");
+        showSecurityToast(`Switched to ${meta.roleName}`, `Clearance: ${meta.tier}. Permissions updated across workspace.`);
       }
     });
   });
@@ -389,6 +763,12 @@ function setupSearch() {
 
 // Quick Sample Demo Scenario
 runSampleBtn.addEventListener("click", () => {
+  const meta = ROLE_HIERARCHY[currentActiveRole] || ROLE_HIERARCHY["SYSTEM_ADMIN"];
+  if (!meta.canIngest) {
+    showSecurityToast("Action Restricted (Read-Only)", `${meta.roleName} is an independent oversight role and cannot ingest digital exhibits.`);
+    return;
+  }
+
   const scenario = FORENSIC_SCENARIOS[scenarioIndex];
   scenarioIndex = (scenarioIndex + 1) % FORENSIC_SCENARIOS.length;
   const randId = Math.floor(Math.random() * 9000 + 1000);
@@ -413,6 +793,12 @@ runSampleBtn.addEventListener("click", () => {
 
 // Manual Scenario Modal Ingestion
 runCustomBtn.addEventListener("click", () => {
+  const meta = ROLE_HIERARCHY[currentActiveRole] || ROLE_HIERARCHY["SYSTEM_ADMIN"];
+  if (!meta.canIngest) {
+    showSecurityToast("Action Restricted (Read-Only)", `${meta.roleName} is an independent oversight role and cannot ingest digital exhibits.`);
+    return;
+  }
+
   const name = document.getElementById("evidenceName").value.trim() || `Exhibit-${Date.now()}`;
   const content = document.getElementById("evidenceContent").value.trim();
   const simulateTamper = document.getElementById("tamperToggle").checked;
@@ -434,6 +820,12 @@ runCustomBtn.addEventListener("click", () => {
 
 // Re-Verify Active Evidence
 verifyBtn.addEventListener("click", async () => {
+  const meta = ROLE_HIERARCHY[currentActiveRole] || ROLE_HIERARCHY["SYSTEM_ADMIN"];
+  if (!meta.canVerify) {
+    showSecurityToast("Forensic Safeguard Active", `${meta.roleName} cannot self-verify evidence intake. Independent verification must be run by a Forensic Analyst or Auditor.`);
+    return;
+  }
+
   if (!currentEvidenceId) return;
   verifyBtn.disabled = true;
   verifyBtnText.textContent = "Verifying…";
@@ -444,7 +836,7 @@ verifyBtn.addEventListener("click", async () => {
       renderVerificationResults(data);
       loadExhibitList();
     } else if (res.status === 403) {
-      alert("Access Denied: Your active role does not have permission to verify evidence.");
+      showSecurityToast("Permission Denied (403)", "Your active role lacks permission to verify evidence.");
     }
   } catch (err) {
     console.error("Verification error:", err);
@@ -456,6 +848,12 @@ verifyBtn.addEventListener("click", async () => {
 
 // Export Evidence Integrity PDF Report with Bearer Authorization
 downloadPdfBtn.addEventListener("click", async () => {
+  const meta = ROLE_HIERARCHY[currentActiveRole] || ROLE_HIERARCHY["SYSTEM_ADMIN"];
+  if (!meta.canReport) {
+    showSecurityToast("Action Restricted", `${meta.roleName} is not authorized to generate forensic integrity reports.`);
+    return;
+  }
+
   if (!currentEvidenceId) return;
   downloadPdfBtn.disabled = true;
   downloadPdfBtn.textContent = "Exporting…";
@@ -463,7 +861,7 @@ downloadPdfBtn.addEventListener("click", async () => {
     const res = await apiFetch(`${API_BASE}/api/v1/reports/${currentEvidenceId}/pdf`);
     if (!res.ok) {
       if (res.status === 403) {
-        alert("Access Denied: Your active role cannot generate forensic reports.");
+        showSecurityToast("Access Denied (403)", "Your active role cannot generate forensic reports.");
       } else {
         alert("Failed to generate report.");
       }

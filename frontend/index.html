@@ -40,20 +40,47 @@
         </select>
       </div>
 
-      <div class="user-menu" id="userMenuBtn">
-        <span class="user-avatar">C</span>
+      <div class="user-menu" id="userMenuBtn" title="Current security clearance">
+        <span class="user-avatar" id="navUserAvatar">A</span>
         <div class="user-info">
-          <span class="user-name" id="navUserName">Charan</span>
-          <span class="user-role" id="navUserRole">System Admin</span>
+          <div class="user-role-row">
+            <span class="clearance-tag-pill" id="navClearanceTag">LEVEL 4</span>
+            <span class="user-name" id="navUserName">System Admin</span>
+          </div>
+          <span class="user-role" id="navUserRole">Full System Clearance</span>
         </div>
         <span class="menu-chevron">▾</span>
         <div class="role-dropdown hidden" id="roleDropdown">
-          <div class="dropdown-header">Demo role</div>
-          <div class="dropdown-subtext">Switch persona for testing</div>
-          <button class="role-option" data-role="EVIDENCE_OFFICER">Evidence Officer</button>
-          <button class="role-option" data-role="FORENSIC_ANALYST">Forensic Analyst</button>
-          <button class="role-option" data-role="AUDITOR">Auditor</button>
-          <button class="role-option active" data-role="SYSTEM_ADMIN">System Admin</button>
+          <div class="dropdown-header">Security Clearance Hierarchy</div>
+          <div class="dropdown-subtext">Switch active persona & access tier</div>
+          <button class="role-option active" data-role="SYSTEM_ADMIN">
+            <span class="opt-tier">L4</span>
+            <div class="opt-meta">
+              <span class="opt-name">System Admin</span>
+              <span class="opt-desc">Full Ledger & System Clearance</span>
+            </div>
+          </button>
+          <button class="role-option" data-role="EVIDENCE_OFFICER">
+            <span class="opt-tier">L3</span>
+            <div class="opt-meta">
+              <span class="opt-name">Evidence Officer</span>
+              <span class="opt-desc">Evidence Intake & Case Registry</span>
+            </div>
+          </button>
+          <button class="role-option" data-role="FORENSIC_ANALYST">
+            <span class="opt-tier">L2</span>
+            <div class="opt-meta">
+              <span class="opt-name">Forensic Analyst</span>
+              <span class="opt-desc">Integrity Verification & Lab Ingestion</span>
+            </div>
+          </button>
+          <button class="role-option" data-role="AUDITOR">
+            <span class="opt-tier">L1</span>
+            <div class="opt-meta">
+              <span class="opt-name">Independent Auditor</span>
+              <span class="opt-desc">Read-Only Oversight & Audit Logs</span>
+            </div>
+          </button>
         </div>
       </div>
     </div>
@@ -64,18 +91,39 @@
 
     <!-- LEFT SIDEBAR: MINIMAL EVIDENCE SELECTOR -->
     <aside class="workspace-sidebar">
+      <!-- ROLE CLEARANCE & HIERARCHY CARD -->
+      <div class="role-clearance-card" id="roleClearanceCard">
+        <div class="clearance-head-row">
+          <span class="clearance-level-tag" id="clearanceLevelTag">LEVEL 4</span>
+          <span class="clearance-title" id="clearanceTitle">System Admin</span>
+        </div>
+        <p class="clearance-summary" id="clearanceSummary">
+          Full root authority across custody chain, case registry, lab ingestion, and immutable audit logs.
+        </p>
+        <div class="clearance-matrix" id="clearanceMatrix">
+          <span class="perm-pill allowed">✓ Case Mgmt</span>
+          <span class="perm-pill allowed">✓ Intake</span>
+          <span class="perm-pill allowed">✓ Verify</span>
+          <span class="perm-pill allowed">✓ Audit Trail</span>
+        </div>
+      </div>
+
       <div class="sidebar-actions">
+        <button id="newCaseBtn" class="btn-sidebar-outline" title="Register new legal case (Officer/Admin only)">
+          <span class="btn-symbol">+</span>
+          <span id="newCaseBtnLabel">New Case</span>
+        </button>
         <button id="runSampleBtn" class="btn-sidebar-primary" title="Cycle through real-world forensic exhibits">
           <span class="btn-symbol">▶</span>
-          <span>Quick Demo Scenario</span>
+          <span id="runSampleBtnLabel">Quick Ingestion</span>
         </button>
         <button id="newEvidenceBtn" class="btn-sidebar-secondary" title="Ingest new exhibit artifact or simulate tamper">
           <span class="btn-symbol">⚙</span>
-          <span>Simulation / Ingestion</span>
+          <span id="newEvidenceBtnLabel">Simulation / Ingestion</span>
         </button>
         <button id="openAuditBtn" class="btn-sidebar-ghost" title="View immutable system audit logs">
           <span class="btn-symbol">≡</span>
-          <span>Audit Trail</span>
+          <span id="openAuditBtnLabel">Audit Trail</span>
         </button>
       </div>
 
@@ -331,9 +379,15 @@
           <h3 class="modal-title">System Audit Trail</h3>
           <span class="modal-subtitle">Immutable security log of all verifications, ingestions, and exports</span>
         </div>
-        <button class="modal-close" id="closeAuditModalBtn">✕</button>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <button id="verifyAuditLedgerBtn" class="btn-sidebar-outline" style="font-size:11px;padding:4px 10px;" title="Cryptographically check previous-event SHA-256 hash continuity">
+            Verify Ledger Continuity
+          </button>
+          <button class="modal-close" id="closeAuditModalBtn">✕</button>
+        </div>
       </div>
       <div class="modal-body">
+        <div id="auditVerifyStatus" class="audit-verify-banner hidden"></div>
         <div class="audit-table-wrap">
           <table class="audit-table">
             <thead>
@@ -351,6 +405,48 @@
           </table>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- NEW CASE REGISTRATION MODAL (OFFICER / ADMIN ONLY) -->
+  <div class="modal-overlay hidden" id="newCaseModal">
+    <div class="modal-card modal-card-sm">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <h3 class="modal-title">Register Forensic Case</h3>
+          <span class="modal-subtitle">Official chain-of-custody case identifier (Level 3/4 Clearance)</span>
+        </div>
+        <button class="modal-close" id="closeNewCaseModalBtn">✕</button>
+      </div>
+      <form id="newCaseForm">
+        <div class="modal-body form-grid">
+          <div class="form-group">
+            <label for="newCaseNumber">Case Number (Unique Reference)</label>
+            <input type="text" id="newCaseNumber" class="form-input" placeholder="CASE-2026-9041" required />
+          </div>
+          <div class="form-group">
+            <label for="newCaseTitle">Case Title / Operation Name</label>
+            <input type="text" id="newCaseTitle" class="form-input" placeholder="e.g. Operation Sovereign Guardian" required />
+          </div>
+          <div class="form-group">
+            <label for="newCaseDesc">Scope & Description</label>
+            <textarea id="newCaseDesc" class="form-input form-textarea" rows="3" placeholder="Brief context, jurisdiction, or legal reference..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-action-ghost" id="cancelNewCaseBtn">Cancel</button>
+          <button type="submit" class="btn-action-primary" id="submitNewCaseBtn">Register Case</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- SECURITY & PERMISSION TOAST -->
+  <div class="security-toast hidden" id="securityToast">
+    <span class="toast-icon" id="toastIcon">🔒</span>
+    <div class="toast-content">
+      <div class="toast-title" id="toastTitle">Permission Denied</div>
+      <div class="toast-msg" id="toastMsg">Role lacks clearance for this action.</div>
     </div>
   </div>
 

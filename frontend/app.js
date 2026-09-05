@@ -5,46 +5,119 @@
 
 const API_BASE = "http://localhost:8000";
 
-// ---- Dynamic sample generator ----
-function generateSampleEvidence() {
+const FORENSIC_SCENARIOS = [
+  {
+    prefix: "Case-2026-WhatsApp-ChatDB",
+    title: "WhatsApp SQLite Chat DB",
+    generate: (caseId, time) =>
+      `CASE_REF: #2026-${caseId}-MOB\nEXHIBIT: WhatsApp SQLite Chat Database\nEXTRACTION_TIME: ${time}\n[14:00:01] Suspect: Meeting at warehouse confirmed.\n[14:01:23] Accomplice: Bring the encrypted drive.\nMD5_SOURCE: d41d8cd98f00b204e9800998ecf8427e`,
+    tamperStep: 2,
+    tamperLabel: "Step 2 — Analyst Tool",
+  },
+  {
+    prefix: "Case-2026-FinFraud-Ledger-TX",
+    title: "Wire Transfer Settlement Ledger",
+    generate: (caseId, time) =>
+      `TRANSACTION_BATCH_AUDIT: TX-${caseId}-WIRE\nBATCH_TIMESTAMP: ${time}\nORIGIN_ROUTING: 021000021 (Chase Bank NY)\nBENEFICIARY_IBAN: GB29NWBK60161331926819\nTRANSFERRED_AMOUNT_USD: $3,750,000.00\nSETTLEMENT_STATUS: CLEARED_BY_FEDWIRE`,
+    tamperStep: 3,
+    tamperLabel: "Step 3 — Export Tool",
+  },
+  {
+    prefix: "Case-2026-CCTV-FrameCheck-North",
+    title: "CCTV Surveillance Checksum",
+    generate: (caseId, time) =>
+      `SURVEILLANCE_STREAM: CAM-04-NORTH-GATE\nFRAME_SYNC_TIME: ${time}\nKEYFRAME_HASH: 7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d\nOFFICER_BADGE: SFPD-0892\nTAMPER_SEAL: PHYSICAL_ZIP_LOCK_TAG_${caseId}`,
+    tamperStep: 4,
+    tamperLabel: "Step 4 — Reviewer",
+  },
+  {
+    prefix: "Case-2026-NVMe-DiskImage-Raw",
+    title: "Bitstream NVMe Physical Drive Image",
+    generate: (caseId, time) =>
+      `BITSTREAM_DISK_IMAGE: PHYSICAL_DRIVE_${caseId}\nIMAGING_TOOL: FTK_Imager_v4.7_HARDWARE_WRITE_BLOCKED\nTIME_ACQUIRED: ${time}\nPARTITION_TABLE: GPT / NTFS_VOLUME_GUID\nSECTOR_RANGE: LBA 0x00000000 - 0x7FFFFFFF`,
+    tamperStep: 5,
+    tamperLabel: "Step 5 — Archive",
+  },
+  {
+    prefix: "Case-2026-HSM-Encrypted-Keystore",
+    title: "Hardware Security Module Key Certificate",
+    generate: (caseId, time) =>
+      `VAULT_KEYSTORE: HSM-LUNA-PCIe-SLOT-${caseId}\nCERTIFICATE_ISSUER: Forensic Root Authority CA\nVALIDATED_AT: ${time}\nALGORITHM: RSA-4096 / SHA-256\nSTATUS: VALID_UNCOMPROMISED_CHAIN`,
+    tamperStep: 0,
+    tamperLabel: "None — Chain Intact",
+  },
+];
+
+let currentScenarioIndex = 0;
+
+function getNextScenario() {
+  const scenario = FORENSIC_SCENARIOS[currentScenarioIndex];
+  currentScenarioIndex = (currentScenarioIndex + 1) % FORENSIC_SCENARIOS.length;
   const caseId = Math.floor(Math.random() * 9000 + 1000);
-  const seizedTime = new Date().toLocaleTimeString();
+  const time = new Date().toLocaleTimeString();
+
   return {
-    name: `Case-2026-${caseId}-Exhibit-A`,
-    content: `CASE_FILE_2026_${caseId}\nSuspect device seized at ${seizedTime}.\nHash chain begins here.`,
+    name: `${scenario.prefix}-#${caseId}`,
+    content: scenario.generate(caseId, time),
+    tamperStep: scenario.tamperStep,
+    tamperLabel: scenario.tamperLabel,
   };
 }
 
 // ---- Element refs ----
-const runBtn      = document.getElementById("runDemoBtn");
-const sampleBtn   = document.getElementById("runSampleBtn");
-const btnText     = document.getElementById("btnText");
-const btnIcon     = document.getElementById("btnIcon");
-const banner      = document.getElementById("verdictBanner");
-const resultsSection = document.getElementById("resultsSection");
-const timeline    = document.getElementById("timeline");
-const tamperToggle = document.getElementById("tamperToggle");
-const toggleDesc   = document.getElementById("toggleDescription");
+const runBtn          = document.getElementById("runDemoBtn");
+const sampleBtn       = document.getElementById("runSampleBtn");
+const btnText         = document.getElementById("btnText");
+const btnIcon         = document.getElementById("btnIcon");
+const banner          = document.getElementById("verdictBanner");
+const resultsSection  = document.getElementById("resultsSection");
+const timeline        = document.getElementById("timeline");
+const tamperToggle    = document.getElementById("tamperToggle");
+const toggleDesc      = document.getElementById("toggleDescription");
+const tamperStepSelect = document.getElementById("tamperStepSelect");
+const metaTamperValue = document.getElementById("metaTamperValue");
 
 // ---- Tamper toggle hint ----
 function updateToggleDesc() {
-  if (tamperToggle.checked) {
-    toggleDesc.textContent = "On — Export Tool will silently alter content and still report success";
-    toggleDesc.style.color = "var(--danger)";
-  } else {
-    toggleDesc.textContent = "Off — Export Tool passes evidence through unchanged (expect Chain Intact)";
+  const step = parseInt(tamperStepSelect ? tamperStepSelect.value : "3", 10);
+  if (!tamperToggle.checked || step === 0) {
+    toggleDesc.textContent = "Off — all handlers pass evidence honestly (expect Chain Intact)";
     toggleDesc.style.color = "var(--success)";
+    if (metaTamperValue) {
+      metaTamperValue.textContent = "None — Clean Pipeline";
+      metaTamperValue.className = "meta-value accent";
+    }
+  } else {
+    const stepNames = { 2: "Step 2 — Analyst Tool", 3: "Step 3 — Export Tool", 4: "Step 4 — Reviewer", 5: "Step 5 — Archive" };
+    const label = stepNames[step] || `Step ${step}`;
+    toggleDesc.textContent = `On — ${label} will silently alter content and still report success`;
+    toggleDesc.style.color = "var(--danger)";
+    if (metaTamperValue) {
+      metaTamperValue.textContent = label;
+      metaTamperValue.className = "meta-value danger";
+    }
   }
 }
+
 tamperToggle.addEventListener("change", updateToggleDesc);
+if (tamperStepSelect) {
+  tamperStepSelect.addEventListener("change", updateToggleDesc);
+}
 updateToggleDesc();
 
-// ---- Quick sample demo ----
+// ---- Quick sample demo (cycles across different scenarios & tamper points) ----
 sampleBtn.addEventListener("click", () => {
-  const sample = generateSampleEvidence();
+  const sample = getNextScenario();
   document.getElementById("evidenceName").value = sample.name;
   document.getElementById("evidenceContent").value = sample.content;
-  runVerification(sample.name, sample.content, tamperToggle.checked);
+
+  if (tamperStepSelect) {
+    tamperStepSelect.value = String(sample.tamperStep);
+  }
+  tamperToggle.checked = sample.tamperStep !== 0;
+  updateToggleDesc();
+
+  runVerification(sample.name, sample.content, tamperToggle.checked, sample.tamperStep);
 });
 
 // ---- Manual form ----
@@ -52,6 +125,7 @@ runBtn.addEventListener("click", () => {
   const name           = document.getElementById("evidenceName").value.trim() || "Untitled-Evidence";
   const content        = document.getElementById("evidenceContent").value.trim();
   const simulateTamper = tamperToggle.checked;
+  const tamperStep     = parseInt(tamperStepSelect ? tamperStepSelect.value : "3", 10);
 
   if (!content) {
     const ta = document.getElementById("evidenceContent");
@@ -61,11 +135,11 @@ runBtn.addEventListener("click", () => {
     ta.focus();
     return;
   }
-  runVerification(name, content, simulateTamper);
+  runVerification(name, content, simulateTamper, tamperStep);
 });
 
 // ---- Shared verification runner ----
-async function runVerification(name, content, simulateTamper) {
+async function runVerification(name, content, simulateTamper, tamperStep = 3) {
   setLoading(true);
   clearResults();
 
@@ -74,7 +148,12 @@ async function runVerification(name, content, simulateTamper) {
     const createRes = await fetch(`${API_BASE}/evidence`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, content, simulate_tamper: simulateTamper }),
+      body: JSON.stringify({
+        name,
+        content,
+        simulate_tamper: simulateTamper,
+        tamper_step: simulateTamper ? tamperStep : 0,
+      }),
     });
 
     if (!createRes.ok) {

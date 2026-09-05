@@ -4,13 +4,22 @@ from services.handlers import HANDLER_PIPELINE
 import models
 
 
-def run_pipeline(db: Session, evidence_name: str, initial_content: str, simulate_tamper: bool = True) -> models.Evidence:
+def run_pipeline(
+    db: Session,
+    evidence_name: str,
+    initial_content: str,
+    simulate_tamper: bool = True,
+    tamper_step: int = 3,
+) -> models.Evidence:
     """
     Runs the evidence through all 5 handlers in sequence.
     Creates one Evidence row and one CustodyLog row per handler step.
     Each log row stores the actual content snapshot after that step,
     which allows the Verifier to independently recompute hashes later
     without trusting any handler's self-reported hash_after value.
+
+    tamper_step: which step_order (2, 3, 4, 5) to inject tamper at when simulate_tamper is True.
+                 If 0 or None, no step is tampered (clean intact chain).
     """
     original_hash = compute_hash(initial_content)
 
@@ -38,10 +47,10 @@ def run_pipeline(db: Session, evidence_name: str, initial_content: str, simulate
             )
 
         hash_before = compute_hash(current_content)
-        if handler_name == "Export Tool":
-            new_content, declared_status = handler_fn(current_content, simulate_tamper)
-        else:
-            new_content, declared_status = handler_fn(current_content)
+        
+        # Inject tamper only at the designated step when simulate_tamper is True
+        should_tamper_this_step = simulate_tamper and (step_order == tamper_step)
+        new_content, declared_status = handler_fn(current_content, simulate_tamper=should_tamper_this_step)
         hash_after = compute_hash(new_content)
 
         log_entry = models.CustodyLog(

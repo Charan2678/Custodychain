@@ -56,7 +56,8 @@ def seed_handlers():
 class EvidenceCreateRequest(BaseModel):
     name: str
     content: str
-    simulate_tamper: bool = True  # when False, Export Tool passes through honestly
+    simulate_tamper: bool = True  # when False, all handlers pass through honestly
+    tamper_step: int = 3          # 2 (Analyst), 3 (Export), 4 (Reviewer), 5 (Archive), 0 (none/intact)
 
 
 # ---------------------------------------------------------------------------
@@ -65,7 +66,13 @@ class EvidenceCreateRequest(BaseModel):
 
 @app.post("/evidence", summary="Create evidence and run it through the full pipeline")
 def create_evidence(payload: EvidenceCreateRequest, db: Session = Depends(get_db)):
-    evidence = run_pipeline(db, payload.name, payload.content, payload.simulate_tamper)
+    evidence = run_pipeline(
+        db,
+        payload.name,
+        payload.content,
+        payload.simulate_tamper,
+        payload.tamper_step,
+    )
     return {"evidence_id": evidence.id, "name": evidence.name}
 
 

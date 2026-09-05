@@ -1,62 +1,63 @@
 from utils.hashing import compute_hash
 
 
-def collector_handle(content: str) -> tuple[str, str]:
+def collector_handle(content: str, simulate_tamper: bool = False) -> tuple[str, str]:
     """
-    Step 1: Collector — initial acquisition of evidence from the 'scene'.
-    This is the origin point. No transformation is applied.
-    Returns the content unchanged and reports success.
+    Step 1: Collector — initial acquisition of evidence from the scene.
+    Baseline origin point. Never tampered.
     """
     return content, "success"
 
 
-def analyst_tool_handle(content: str) -> tuple[str, str]:
+def analyst_tool_handle(content: str, simulate_tamper: bool = False) -> tuple[str, str]:
     """
     Step 2: Analyst Tool — performs read-only analysis of the evidence.
-    Must NOT alter the evidence in any way. Content passes through unchanged.
+    When simulate_tamper=True: secretly injects unauthorized metadata tag into evidence
+    while still falsely reporting status='success'.
     """
+    if simulate_tamper:
+        tampered_content = content + "\n[METADATA_INJECTED_BY_ANALYST: UNTRACKED_TAG_88]"
+        return tampered_content, "success"
     return content, "success"
 
 
-def export_tool_handle(content: str, simulate_tamper: bool = True) -> tuple[str, str]:
+def export_tool_handle(content: str, simulate_tamper: bool = False) -> tuple[str, str]:
     """
-    Step 3: Export Tool — THE TAMPER INJECTION POINT (when simulate_tamper=True).
-
-    When simulate_tamper is True:
-      Silently alters the evidence content by converting Unix line endings (\\n)
-      to Windows-style CRLF line endings (\\r\\n) — a subtle, plausible encoding
-      change that is invisible to a casual human reviewer — then still declares
-      status='success' as if nothing happened.
-
-    When simulate_tamper is False:
-      Honest pass-through: content is not altered, status='success' is truthful.
-      The full chain should then verify as CHAIN_INTACT.
+    Step 3: Export Tool — format conversion / export stage.
+    When simulate_tamper=True: silently changes line-ending encoding (\n -> \r\n),
+    altering the byte stream while falsely reporting status='success'.
     """
     if simulate_tamper:
         tampered_content = content.replace("\n", "\r\n")
-        return tampered_content, "success"  # declares success despite altering content
-    return content, "success"  # honest pass-through
-
-
-def reviewer_handle(content: str) -> tuple[str, str]:
-    """
-    Step 4: Reviewer — human review of the (already silently tampered) evidence.
-    The reviewer sees no obvious error on the surface; the file looks fine visually.
-    Content passes through unchanged from this handler's perspective.
-    """
+        return tampered_content, "success"
     return content, "success"
 
 
-def archive_handle(content: str) -> tuple[str, str]:
+def reviewer_handle(content: str, simulate_tamper: bool = False) -> tuple[str, str]:
     """
-    Step 5: Archive — final long-term storage of the evidence.
-    No transformation applied. Stores the final (tampered) state.
+    Step 4: Reviewer — human verification and legal review.
+    When simulate_tamper=True: reviewer silently redacts or adds unlogged notes
+    while declaring status='success'.
     """
+    if simulate_tamper:
+        tampered_content = content + "\n[LEGAL_REDACTION_APPLIED_WITHOUT_REHASH]"
+        return tampered_content, "success"
+    return content, "success"
+
+
+def archive_handle(content: str, simulate_tamper: bool = False) -> tuple[str, str]:
+    """
+    Step 5: Archive — long-term storage in forensic vault.
+    When simulate_tamper=True: simulates silent storage bit-flip / storage corruption
+    while declaring status='success'.
+    """
+    if simulate_tamper:
+        tampered_content = content + "\n[BIT_ROT_ARCHIVE_STORAGE_DEGRADATION: 0x00]"
+        return tampered_content, "success"
     return content, "success"
 
 
 # Ordered pipeline: (step_order, handler_name, handler_function)
-# Keep this in sync with the `handlers` table seed data.
 HANDLER_PIPELINE = [
     (1, "Collector", collector_handle),
     (2, "Analyst Tool", analyst_tool_handle),

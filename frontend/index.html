@@ -44,9 +44,21 @@
 
           <div class="divider-or"><span>or enter your own evidence</span></div>
 
-          <div class="field">
-            <label for="evidenceName">Case / Exhibit ID</label>
-            <input type="text" id="evidenceName" placeholder="Case-2026-0912-Exhibit-A" />
+          <div class="field-row">
+            <div class="field">
+              <label for="evidenceName">Case / Exhibit ID</label>
+              <input type="text" id="evidenceName" placeholder="Case-2026-0912-Exhibit-A" />
+            </div>
+            <div class="field">
+              <label for="tamperStepSelect">Inject tamper at</label>
+              <select id="tamperStepSelect" class="field-select">
+                <option value="3">Step 3 — Export Tool (Silent CRLF)</option>
+                <option value="2">Step 2 — Analyst Tool (Unauthorized Tag)</option>
+                <option value="4">Step 4 — Reviewer (Unlogged Redaction)</option>
+                <option value="5">Step 5 — Archive (Storage Bit-Rot)</option>
+                <option value="0">None — Verified Chain Intact</option>
+              </select>
+            </div>
           </div>
 
           <div class="field">
@@ -60,8 +72,8 @@
               <span class="toggle-slider"></span>
             </span>
             <span class="toggle-text">
-              <strong>Simulate tamper at Export Tool</strong>
-              <span id="toggleDescription" class="toggle-desc">On — Export Tool will silently alter content and still report success</span>
+              <strong>Simulate tamper injection</strong>
+              <span id="toggleDescription" class="toggle-desc">On — The selected pipeline handler will silently alter content while reporting success</span>
             </span>
           </label>
 
@@ -109,7 +121,7 @@
             </div>
             <div class="meta-block">
               <span class="meta-label">Tamper injected at</span>
-              <span class="meta-value danger">Step 3 — Export Tool</span>
+              <span class="meta-value danger" id="metaTamperValue">Step 3 — Export Tool</span>
             </div>
             <div class="meta-block">
               <span class="meta-label">Verification mode</span>
@@ -130,18 +142,7 @@
 
     </div>
 
-    <footer class="app-footer">
-      <div class="footer-left">
-        <span class="brand-mini">◆ CustodyChain v1.0</span>
-        <span class="footer-sep">·</span>
-        <span>Cryptographic Evidence Verification</span>
-      </div>
-      <div class="footer-right">
-        <span>Myonsite Hackathon</span>
-        <span class="footer-sep">·</span>
-        <span>Built by Charan</span>
-      </div>
-    </footer>
+    <footer class="app-footer">CustodyChain v1.0 &nbsp;·&nbsp; Myonsite Hackathon &nbsp;·&nbsp; Built by Charan</footer>
 
   </div>
 

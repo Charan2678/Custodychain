@@ -5,8 +5,15 @@
 
 const API_BASE = "http://localhost:8000";
 
+// ---- Sample evidence (pre-loaded for quick demo) ----
+const SAMPLE_EVIDENCE = {
+  name: "Case-2026-0912-Exhibit-A",
+  content: "CASE_FILE_2026_0912\nSuspect device seized at 14:02.\nHash chain begins here.",
+};
+
 // ---- Element refs ----
 const runBtn      = document.getElementById("runDemoBtn");
+const sampleBtn   = document.getElementById("runSampleBtn");
 const btnText     = document.getElementById("btnText");
 const btnIcon     = document.getElementById("btnIcon");
 const banner      = document.getElementById("verdictBanner");
@@ -28,15 +35,17 @@ function updateToggleDesc() {
 tamperToggle.addEventListener("change", updateToggleDesc);
 updateToggleDesc();
 
-// ---- Run Demo ----
-runBtn.addEventListener("click", runDemo);
+// ---- Quick sample demo ----
+sampleBtn.addEventListener("click", () => {
+  runVerification(SAMPLE_EVIDENCE.name, SAMPLE_EVIDENCE.content, tamperToggle.checked);
+});
 
-async function runDemo() {
+// ---- Manual form ----
+runBtn.addEventListener("click", () => {
   const name           = document.getElementById("evidenceName").value.trim() || "Untitled-Evidence";
   const content        = document.getElementById("evidenceContent").value.trim();
   const simulateTamper = tamperToggle.checked;
 
-  // Validate
   if (!content) {
     const ta = document.getElementById("evidenceContent");
     ta.style.borderColor = "var(--danger)";
@@ -45,7 +54,11 @@ async function runDemo() {
     ta.focus();
     return;
   }
+  runVerification(name, content, simulateTamper);
+});
 
+// ---- Shared verification runner ----
+async function runVerification(name, content, simulateTamper) {
   setLoading(true);
   clearResults();
 
@@ -87,7 +100,8 @@ async function runDemo() {
 
 // ---- Loading state ----
 function setLoading(loading) {
-  runBtn.disabled = loading;
+  runBtn.disabled    = loading;
+  sampleBtn.disabled = loading;
   if (loading) {
     btnText.textContent = "Running…";
     btnIcon.innerHTML = '<span class="spinner"></span>';

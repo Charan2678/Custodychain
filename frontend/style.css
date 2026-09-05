@@ -118,7 +118,36 @@ body {
 .toggle-text { display: flex; flex-direction: column; gap: 3px; font-size: 14px; }
 .toggle-desc { font-size: 12px; color: var(--text-secondary); }
 
-/* ---- Button ---- */
+/* ---- Quick demo row ---- */
+.quick-demo-row {
+  display: flex; justify-content: space-between; align-items: center;
+  background: var(--surface-raised); border: 1px solid var(--border-strong);
+  border-radius: 8px; padding: 16px 18px; gap: 16px;
+}
+.quick-demo-row strong { font-size: 14px; display: block; margin-bottom: 3px; }
+.quick-demo-desc { font-size: 12px; color: var(--text-secondary); }
+
+.btn-secondary {
+  background: transparent; color: var(--accent); border: 1px solid var(--accent-dim);
+  border-radius: 8px; padding: 10px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
+  display: flex; align-items: center; gap: 6px; white-space: nowrap; flex-shrink: 0;
+  transition: background 0.15s, border-color 0.15s;
+  font-family: var(--font-sans);
+}
+.btn-secondary:hover { background: rgba(34, 211, 238, 0.08); border-color: var(--accent); }
+.btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ---- Divider ---- */
+.divider-or {
+  display: flex; align-items: center; gap: 12px;
+  font-size: 12px; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.divider-or::before, .divider-or::after {
+  content: ""; flex: 1; height: 1px; background: var(--border);
+}
+
+/* ---- Button (primary) ---- */
 .btn-primary {
   background: var(--accent); color: #04202a; border: none; border-radius: 8px;
   padding: 14px 20px; font-size: 14px; font-weight: 700; cursor: pointer;

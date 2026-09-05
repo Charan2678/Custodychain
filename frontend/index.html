@@ -275,6 +275,50 @@
           </div>
         </div>
 
+        <!-- CUSTODY HANDOVER & PROGRESSION CARD -->
+        <div class="custody-handover-card hidden" id="custodyHandoverCard">
+          <div class="handover-header">
+            <div class="handover-title-row">
+              <span class="handover-icon">⇄</span>
+              <div>
+                <h3 class="handover-title" id="handoverTitle">Chain of Custody Handover</h3>
+                <span class="handover-subtitle" id="handoverSubtitle">Current Handler: Step 1 (Collector)</span>
+              </div>
+            </div>
+            <span class="handover-status-badge" id="handoverStatusBadge">Awaiting Handover</span>
+          </div>
+          <div class="handover-body">
+            <div class="handover-flow-grid">
+              <div class="handover-actor-box">
+                <span class="actor-label">Current Custodian</span>
+                <div class="actor-name" id="handoverCurrentActor">Officer John Vance</div>
+                <span class="actor-role-badge" id="handoverCurrentRole">Evidence Officer</span>
+              </div>
+              <div class="handover-arrow-box">➔</div>
+              <div class="handover-actor-box">
+                <span class="actor-label">Next Handler / Destination</span>
+                <div class="actor-name" id="handoverNextActor">Dr. Elena Rostova</div>
+                <span class="actor-role-badge" id="handoverNextRole">Forensic Analyst</span>
+              </div>
+            </div>
+            <div class="handover-action-row">
+              <div class="handover-sim-option">
+                <label class="checkbox-label" for="handoverTamperToggle" title="Simulate silent tamper during this specific transfer">
+                  <input type="checkbox" id="handoverTamperToggle" />
+                  <span>Simulate corruption on this handover</span>
+                </label>
+              </div>
+              <div class="handover-btn-wrap">
+                <button id="advanceCustodyBtn" class="btn-handover-action" type="button">
+                  <span class="btn-symbol">➔</span>
+                  <span id="advanceCustodyBtnText">Pass Custody to Next Person</span>
+                </button>
+                <span class="handover-hint" id="handoverHint"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="timeline-cards" id="timelineCards">
           <!-- Populated dynamically with simplified cards -->
           <div class="empty-timeline-notice">

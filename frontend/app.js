@@ -10,32 +10,32 @@ const FORENSIC_SCENARIOS = [
     title: "WhatsApp SQLite Chat DB",
     generate: (caseId, time) =>
       `CASE_REF: #2026-${caseId}-MOB\nEXHIBIT: WhatsApp SQLite Chat Database\nEXTRACTION_TIME: ${time}\n[14:00:01] Suspect: Meeting at warehouse confirmed.\n[14:01:23] Accomplice: Bring the encrypted drive.\nMD5_SOURCE: d41d8cd98f00b204e9800998ecf8427e`,
-    tamperStep: 3,
-    tamperLabel: "Step 3 — Export Tool (Silent CRLF Alteration)",
+    tamperStep: 0,
+    tamperLabel: "Pure Verified Intact Chain",
   },
   {
     prefix: "Case-2026-FinFraud-Ledger-TX",
     title: "Wire Transfer Settlement Ledger",
     generate: (caseId, time) =>
       `TRANSACTION_BATCH_AUDIT: TX-${caseId}-WIRE\nBATCH_TIMESTAMP: ${time}\nORIGIN_ROUTING: 021000021 (Chase Bank NY)\nBENEFICIARY_IBAN: GB29NWBK60161331926819\nTRANSFERRED_AMOUNT_USD: $3,750,000.00\nSETTLEMENT_STATUS: CLEARED_BY_FEDWIRE`,
-    tamperStep: 2,
-    tamperLabel: "Step 2 — Analyst Tool (Unauthorized Metadata Tag)",
+    tamperStep: 0,
+    tamperLabel: "Pure Verified Intact Chain",
   },
   {
     prefix: "Case-2026-CCTV-FrameCheck-North",
     title: "CCTV Surveillance Stream Checksum",
     generate: (caseId, time) =>
       `SURVEILLANCE_STREAM: CAM-04-NORTH-GATE\nFRAME_SYNC_TIME: ${time}\nKEYFRAME_HASH: 7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d\nOFFICER_BADGE: SFPD-0892\nTAMPER_SEAL: PHYSICAL_ZIP_LOCK_TAG_${caseId}`,
-    tamperStep: 4,
-    tamperLabel: "Step 4 — Reviewer (Unlogged Redaction)",
+    tamperStep: 0,
+    tamperLabel: "Pure Verified Intact Chain",
   },
   {
     prefix: "Case-2026-NVMe-DiskImage-Raw",
     title: "Bitstream NVMe Physical Drive Image",
     generate: (caseId, time) =>
       `BITSTREAM_DISK_IMAGE: PHYSICAL_DRIVE_${caseId}\nIMAGING_TOOL: FTK_Imager_v4.7_HARDWARE_WRITE_BLOCKED\nTIME_ACQUIRED: ${time}\nPARTITION_TABLE: GPT / NTFS_VOLUME_GUID\nSECTOR_RANGE: LBA 0x00000000 - 0x7FFFFFFF`,
-    tamperStep: 5,
-    tamperLabel: "Step 5 — Archive (Storage Bit-Rot)",
+    tamperStep: 0,
+    tamperLabel: "Pure Verified Intact Chain",
   },
   {
     prefix: "Case-2026-HSM-Encrypted-Keystore",
@@ -43,7 +43,7 @@ const FORENSIC_SCENARIOS = [
     generate: (caseId, time) =>
       `VAULT_KEYSTORE: HSM-LUNA-PCIe-SLOT-${caseId}\nCERTIFICATE_ISSUER: Forensic Root Authority CA\nVALIDATED_AT: ${time}\nALGORITHM: RSA-4096 / SHA-256\nSTATUS: VALID_UNCOMPROMISED_CHAIN`,
     tamperStep: 0,
-    tamperLabel: "None — Pure Verified Intact Chain",
+    tamperLabel: "Pure Verified Intact Chain",
   },
 ];
 
@@ -217,6 +217,20 @@ const explanationBody     = document.getElementById("explanationBody");
 const closeExplanationBtn = document.getElementById("closeExplanationBtn");
 
 const timelineCards       = document.getElementById("timelineCards");
+
+// Custody Handover Card Elements
+const custodyHandoverCard   = document.getElementById("custodyHandoverCard");
+const handoverTitle         = document.getElementById("handoverTitle");
+const handoverSubtitle      = document.getElementById("handoverSubtitle");
+const handoverStatusBadge   = document.getElementById("handoverStatusBadge");
+const handoverCurrentActor  = document.getElementById("handoverCurrentActor");
+const handoverCurrentRole   = document.getElementById("handoverCurrentRole");
+const handoverNextActor     = document.getElementById("handoverNextActor");
+const handoverNextRole      = document.getElementById("handoverNextRole");
+const handoverTamperToggle  = document.getElementById("handoverTamperToggle");
+const advanceCustodyBtn     = document.getElementById("advanceCustodyBtn");
+const advanceCustodyBtnText = document.getElementById("advanceCustodyBtnText");
+const handoverHint          = document.getElementById("handoverHint");
 
 const userMenuBtn         = document.getElementById("userMenuBtn");
 const roleDropdown        = document.getElementById("roleDropdown");
@@ -428,6 +442,11 @@ function applyRoleHierarchy(roleKey) {
       downloadPdfBtn.classList.add("action-locked");
       downloadPdfBtn.title = "🔒 Restricted: Report generation restricted to Forensic Analysts, Auditors, and Admins.";
     }
+  }
+
+  // 5. Update custody handover card according to newly active role
+  if (currentVerificationData && typeof updateCustodyHandoverCard === "function") {
+    updateCustodyHandoverCard(currentVerificationData);
   }
 }
 
@@ -644,6 +663,43 @@ function setupModals() {
   closeExplanationBtn.addEventListener("click", () => {
     explanationCard.classList.add("hidden");
   });
+
+  // Interactive Custody Handover Advancement Button
+  if (advanceCustodyBtn) {
+    advanceCustodyBtn.addEventListener("click", async () => {
+      if (!currentEvidenceId) return;
+
+      advanceCustodyBtn.disabled = true;
+      advanceCustodyBtnText.textContent = "Transferring & Signing…";
+
+      const simulateTamper = handoverTamperToggle ? handoverTamperToggle.checked : false;
+
+      try {
+        const res = await apiFetch(`${API_BASE}/api/v1/evidence/${currentEvidenceId}/transfer`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ simulate_tamper: simulateTamper }),
+        });
+
+        if (res.ok) {
+          const updatedData = await res.json();
+          if (handoverTamperToggle) handoverTamperToggle.checked = false;
+          renderVerificationResults(updatedData);
+          loadExhibitList();
+
+          const latestStep = updatedData.steps ? updatedData.steps[updatedData.steps.length - 1] : null;
+          showSecurityToast("Custody Transferred", `Step ${latestStep?.step_order || ''} (${latestStep?.handler_name || 'Handover'}) executed & cryptographically signed.`);
+        } else {
+          const err = await res.json().catch(() => ({ detail: "Handover failed" }));
+          showSecurityToast("Transfer Prohibited (403)", err.detail || "Clearance lacked for this handover.");
+          if (currentVerificationData) updateCustodyHandoverCard(currentVerificationData);
+        }
+      } catch (err) {
+        showSecurityToast("Network Error", err.message);
+        if (currentVerificationData) updateCustodyHandoverCard(currentVerificationData);
+      }
+    });
+  }
 }
 
 // Sidebar Collapse / Expand Toggle
@@ -761,7 +817,7 @@ function setupSearch() {
   });
 }
 
-// Quick Sample Demo Scenario
+// Quick Sample Ingestion (Step-by-Step Initial Intake)
 runSampleBtn.addEventListener("click", () => {
   const meta = ROLE_HIERARCHY[currentActiveRole] || ROLE_HIERARCHY["SYSTEM_ADMIN"];
   if (!meta.canIngest) {
@@ -776,18 +832,19 @@ runSampleBtn.addEventListener("click", () => {
 
   const name = `${scenario.prefix}-#${randId}`;
   const content = scenario.generate(randId, time);
-  const simulateTamper = scenario.tamperStep !== 0;
 
   document.getElementById("evidenceName").value = name;
   document.getElementById("evidenceContent").value = content;
-  document.getElementById("tamperStepSelect").value = String(scenario.tamperStep);
-  document.getElementById("tamperToggle").checked = simulateTamper;
+  document.getElementById("tamperStepSelect").value = "0";
+  document.getElementById("tamperToggle").checked = false;
 
+  // Registered at Step 1 (Collector) intact by Evidence Officer, awaiting handover
   ingestAndVerify({
     name,
     content,
-    simulate_tamper: simulateTamper,
-    tamper_step: scenario.tamperStep,
+    step_by_step: true,
+    simulate_tamper: false,
+    tamper_step: 0,
   });
 });
 
@@ -813,6 +870,7 @@ runCustomBtn.addEventListener("click", () => {
   ingestAndVerify({
     name,
     content,
+    step_by_step: !simulateTamper, // Step-by-step for clean exhibits; direct pipeline execution for tamper tests
     simulate_tamper: simulateTamper,
     tamper_step: tamperStep,
   });
@@ -900,8 +958,9 @@ async function ingestAndVerify(payload) {
         name: payload.name,
         content: payload.content,
         case_id: currentCaseId,
-        simulate_tamper: payload.simulate_tamper,
-        tamper_step: payload.tamper_step,
+        step_by_step: payload.step_by_step !== undefined ? payload.step_by_step : true,
+        simulate_tamper: payload.simulate_tamper || false,
+        tamper_step: payload.tamper_step || 0,
       }),
     });
 
@@ -913,21 +972,164 @@ async function ingestAndVerify(payload) {
       throw new Error(err.detail || `Server error: ${createRes.status}`);
     }
 
-    const created = await createRes.json();
-    currentEvidenceId = created.evidence_id;
+    const createdData = await createRes.json();
+    currentEvidenceId = createdData.evidence_id;
 
-    // Independent Multi-Vector Verification
-    const verifyRes = await apiFetch(`${API_BASE}/api/v1/verification/${currentEvidenceId}`, { method: "POST" });
-    if (!verifyRes.ok) throw new Error("Failed to verify evidence");
-    const verifyData = await verifyRes.json();
-
-    renderVerificationResults(verifyData);
+    // Direct render from authoritative backend verification response
+    renderVerificationResults(createdData);
     loadExhibitList();
 
+    const isStep1 = createdData.steps && createdData.steps.length === 1;
+    if (isStep1) {
+      showSecurityToast("Evidence Ingested (Step 1)", `Exhibit registered intact at Step 1 (Collector) by ${ROLE_HIERARCHY[currentActiveRole]?.fullName || 'Officer'}. Awaiting handover.`);
+    } else {
+      showSecurityToast("Pipeline Executed", `Exhibit ${createdData.exhibit_id || '#' + createdData.evidence_id} processed across custody chain.`);
+    }
+
   } catch (err) {
-    alert("Error running custody pipeline: " + err.message);
+    showSecurityToast("Ingestion Error", err.message);
   } finally {
     setGlobalLoading(false);
+  }
+}
+
+// Handover Progression Sequence Definitions
+const HANDOVER_STAGES = [
+  {
+    step: 1,
+    title: "Stage 1: Evidence Intake & Scene Seizure",
+    subtitle: "Exhibit registered in forensic ledger. Ready for handover to Forensic Laboratory.",
+    currentActor: "Officer John Vance",
+    currentRole: "Evidence Officer",
+    nextActor: "Dr. Elena Rostova",
+    nextRole: "Forensic Analyst",
+    actionName: "Pass Custody to Dr. Elena Rostova",
+    allowedRoles: ["EVIDENCE_OFFICER", "SYSTEM_ADMIN"],
+    roleRequirementText: "Requires Evidence Officer or System Admin clearance to authorize transfer.",
+  },
+  {
+    step: 2,
+    title: "Stage 2: Laboratory Ingestion",
+    subtitle: "Exhibit in forensic laboratory custody. Ready for analysis & format export.",
+    currentActor: "Dr. Elena Rostova",
+    currentRole: "Forensic Analyst",
+    nextActor: "Forensic Laboratory (Export Tool)",
+    nextRole: "Forensic Analyst",
+    actionName: "Execute Laboratory Analysis & Export",
+    allowedRoles: ["FORENSIC_ANALYST", "SYSTEM_ADMIN"],
+    roleRequirementText: "Requires Forensic Analyst or System Admin clearance to run lab analysis.",
+  },
+  {
+    step: 3,
+    title: "Stage 3: Export Processing Completed",
+    subtitle: "Lab processing finalized. Ready for handover to Legal Review Division.",
+    currentActor: "Dr. Elena Rostova",
+    currentRole: "Forensic Analyst",
+    nextActor: "Legal Review Division",
+    nextRole: "Legal Reviewer",
+    actionName: "Submit to Legal Review",
+    allowedRoles: ["FORENSIC_ANALYST", "SYSTEM_ADMIN"],
+    roleRequirementText: "Requires Forensic Analyst or System Admin clearance to submit for legal review.",
+  },
+  {
+    step: 4,
+    title: "Stage 4: Legal Review Finalized",
+    subtitle: "Legal chain verified. Ready for long-term sealing in Forensic Archive Vault.",
+    currentActor: "Legal Review Division",
+    currentRole: "Legal Review",
+    nextActor: "Forensic Archive Vault",
+    nextRole: "Archive Vault",
+    actionName: "Seal into Archive Vault",
+    allowedRoles: ["FORENSIC_ANALYST", "SYSTEM_ADMIN"],
+    roleRequirementText: "Requires Forensic Analyst or System Admin clearance to seal into vault.",
+  },
+];
+
+// Update Custody Handover Progression Card
+function updateCustodyHandoverCard(data) {
+  if (!custodyHandoverCard) return;
+
+  custodyHandoverCard.classList.remove("hidden");
+  custodyHandoverCard.classList.remove("awaiting", "completed", "broken-state");
+
+  const steps = data.steps || [];
+  const stepCount = steps.length;
+  const isIntact = data.final_verdict === "CHAIN_INTACT";
+  const firstBreak = data.first_break || (steps.find(s => !s.verified) || null);
+
+  // Case 1: Tamper or Break detected
+  if (!isIntact || firstBreak) {
+    custodyHandoverCard.classList.add("broken-state");
+    handoverTitle.textContent = `Custody Severed at ${firstBreak?.handler_name || 'Handler'} (Step ${firstBreak?.step_order || '?'})`;
+    handoverSubtitle.textContent = "Integrity check failed. Digital artifact does not match cryptographic ledger.";
+    handoverStatusBadge.className = "handover-status-badge broken";
+    handoverStatusBadge.textContent = "Broken — Handover Halted";
+
+    handoverCurrentActor.textContent = firstBreak?.handler_name || "Compromised Handler";
+    handoverCurrentRole.textContent = "Broken Transition";
+    handoverNextActor.textContent = "Quarantined";
+    handoverNextRole.textContent = "Tainted Evidence";
+
+    advanceCustodyBtn.disabled = true;
+    advanceCustodyBtnText.textContent = "✕ Custody Transfers Barred";
+    handoverHint.textContent = "Forensic protocol prohibits transferring or processing compromised exhibits.";
+    if (handoverTamperToggle) handoverTamperToggle.disabled = true;
+    return;
+  }
+
+  // Case 2: All 5 Handlers Completed (Lifecycle Archive Vault Complete)
+  if (stepCount >= 5) {
+    custodyHandoverCard.classList.add("completed");
+    handoverTitle.textContent = "Chain of Custody Lifecycle Complete";
+    handoverSubtitle.textContent = "Exhibit permanently sealed and archived in forensic vault. All 5 handler transitions verified.";
+    handoverStatusBadge.className = "handover-status-badge complete";
+    handoverStatusBadge.textContent = "Archived & Sealed (5 of 5)";
+
+    handoverCurrentActor.textContent = "Forensic Archive Vault";
+    handoverCurrentRole.textContent = "WORM Storage";
+    handoverNextActor.textContent = "Court Admissible";
+    handoverNextRole.textContent = "Verified Legal Ledger";
+
+    advanceCustodyBtn.disabled = true;
+    advanceCustodyBtnText.textContent = "✓ Lifecycle Sealed in Vault";
+    handoverHint.textContent = "Cryptographic ledger continuity and Ed25519 signatures permanently immutable.";
+    if (handoverTamperToggle) handoverTamperToggle.disabled = true;
+    return;
+  }
+
+  // Case 3: Step-by-Step Handover Ready (Step 1 to 4)
+  custodyHandoverCard.classList.add("awaiting");
+  if (handoverTamperToggle) handoverTamperToggle.disabled = false;
+
+  const currentStage = HANDOVER_STAGES[stepCount - 1] || HANDOVER_STAGES[0];
+
+  handoverTitle.textContent = currentStage.title;
+  handoverSubtitle.textContent = `${currentStage.subtitle} (Step ${stepCount} of 5 Completed)`;
+  handoverStatusBadge.className = "handover-status-badge";
+  handoverStatusBadge.textContent = `Awaiting Step ${stepCount + 1} Handover`;
+
+  handoverCurrentActor.textContent = currentStage.currentActor;
+  handoverCurrentRole.textContent = currentStage.currentRole;
+  handoverNextActor.textContent = currentStage.nextActor;
+  handoverNextRole.textContent = currentStage.nextRole;
+
+  // Check Role Clearance for current transition
+  const hasClearance = currentStage.allowedRoles.includes(currentActiveRole);
+
+  if (hasClearance) {
+    advanceCustodyBtn.disabled = false;
+    advanceCustodyBtnText.textContent = currentStage.actionName;
+    handoverHint.textContent = `Authorized as ${ROLE_HIERARCHY[currentActiveRole]?.roleName || currentActiveRole}. Click to cryptographically sign handover.`;
+  } else {
+    advanceCustodyBtn.disabled = true;
+    if (currentActiveRole === "AUDITOR") {
+      advanceCustodyBtnText.textContent = "🔒 Handover Prohibited (Read-Only)";
+      handoverHint.textContent = "Auditors hold read-only compliance oversight and cannot sign custody handovers.";
+    } else {
+      const requiredRoleName = currentStage.allowedRoles[0] === "EVIDENCE_OFFICER" ? "Evidence Officer" : "Forensic Analyst";
+      advanceCustodyBtnText.textContent = `🔒 Requires ${requiredRoleName}`;
+      handoverHint.textContent = currentStage.roleRequirementText;
+    }
   }
 }
 
@@ -939,6 +1141,7 @@ function renderVerificationResults(data) {
   const isIntact = data.final_verdict === "CHAIN_INTACT";
   // Authoritative first_break object provided directly by backend
   const firstBreak = data.first_break || (data.steps ? data.steps.find(s => !s.verified) : null);
+  const stepCount = data.steps ? data.steps.length : 0;
 
   // Level 1: What is happening?
   headerExhibitTitle.textContent = data.evidence_name;
@@ -946,7 +1149,7 @@ function renderVerificationResults(data) {
   
   if (isIntact) {
     headerStatusTag.className = "status-summary-tag verified";
-    headerStatusTag.textContent = "Chain intact";
+    headerStatusTag.textContent = stepCount < 5 ? `Intact (${stepCount} of 5)` : "Chain intact";
   } else {
     headerStatusTag.className = "status-summary-tag broken";
     headerStatusTag.textContent = `Broken at ${firstBreak?.handler_name || 'pipeline'}`;
@@ -964,9 +1167,11 @@ function renderVerificationResults(data) {
 
   if (isIntact) {
     verdictTitle.textContent = "Chain intact";
-    verdictBreakPoint.textContent = "· All 5 handlers verified";
+    verdictBreakPoint.textContent = `· ${stepCount} handler${stepCount === 1 ? '' : 's'} verified`;
     verdictExplanation.textContent =
-      "All custody handoffs independently recomputed. Artifact storage states match baseline hashes, and all digital signatures are authentic.";
+      stepCount < 5
+        ? `Evidence exhibit verified at Step ${stepCount}. Previous-event ledger continuous, Ed25519 signatures valid, and WORM storage hashes match.`
+        : "All 5 custody handoffs independently recomputed. Artifact storage states match baseline hashes, and all digital signatures are authentic.";
   } else {
     verdictTitle.textContent = "Chain broken";
     verdictBreakPoint.textContent = `· First verifiable break: ${firstBreak?.handler_name || 'Step'} (Step ${firstBreak?.step_order || '?'})`;
@@ -979,9 +1184,13 @@ function renderVerificationResults(data) {
     renderExplanation(data);
   }
 
+  // Update Custody Handover Card
+  updateCustodyHandoverCard(data);
+
   // Level 2 & 3: Timeline Cards with Progressive Disclosure
   renderTimelineCards(data);
 }
+
 
 // Render Conversational Explanation ("Why is this broken / intact?")
 function renderExplanation(data) {
@@ -1185,7 +1394,7 @@ toggleAllExhibitsBtn.addEventListener("click", () => {
 
 async function selectExhibit(id) {
   try {
-    const verifyRes = await apiFetch(`${API_BASE}/api/v1/verification/${id}`, { method: "POST" });
+    const verifyRes = await apiFetch(`${API_BASE}/api/v1/verification/${id}`, { method: "GET" });
     if (verifyRes.ok) {
       const data = await verifyRes.json();
       renderVerificationResults(data);

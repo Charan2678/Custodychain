@@ -15,6 +15,10 @@ def run_verification(
     current_user: models.User = Depends(require_role(["FORENSIC_ANALYST", "AUDITOR", "SYSTEM_ADMIN"])),
     db: Session = Depends(get_db),
 ):
+    """
+    Executes independent multi-vector verification. Restricted to Forensic Analyst, Auditor, and Admin.
+    Evidence Officers are prohibited from self-verifying intake under court forensic standards.
+    """
     evidence = db.query(models.Evidence).filter(models.Evidence.id == evidence_id).first()
     if not evidence:
         raise HTTPException(status_code=404, detail="Evidence not found")
@@ -26,24 +30,16 @@ def run_verification(
 @router.get("/{evidence_id}")
 def get_latest_verification(
     evidence_id: int,
-    current_user: models.User = Depends(require_role(["FORENSIC_ANALYST", "AUDITOR", "SYSTEM_ADMIN"])),
+    current_user: models.User = Depends(require_role(["SYSTEM_ADMIN", "EVIDENCE_OFFICER", "FORENSIC_ANALYST", "AUDITOR"])),
     db: Session = Depends(get_db),
 ):
-    verdict = (
-        db.query(models.VerificationResult)
-        .filter(models.VerificationResult.evidence_id == evidence_id)
-        .order_by(models.VerificationResult.id.desc())
-        .first()
-    )
-    if not verdict:
-        # Run verification automatically if not yet run
-        return verify_evidence_integrity(db, evidence_id, auditor_name=current_user.name)
+    """
+    Retrieves the authoritative multi-vector custody verification status for an exhibit.
+    All authenticated roles in the forensic hierarchy may view the custody verification state.
+    """
+    evidence = db.query(models.Evidence).filter(models.Evidence.id == evidence_id).first()
+    if not evidence:
+        raise HTTPException(status_code=404, detail="Evidence not found")
 
-    return {
-        "evidence_id": evidence_id,
-        "final_verdict": verdict.final_verdict,
-        "broken_step_order": verdict.broken_step_order,
-        "broken_handler_id": verdict.broken_handler_id,
-        "broken_step_id": verdict.broken_handler_id or verdict.broken_step_order,
-        "checked_at": verdict.checked_at.isoformat() if verdict.checked_at else None,
-    }
+    # Authoritative verification inspection
+    return verify_evidence_integrity(db, evidence_id, auditor_name=current_user.name)

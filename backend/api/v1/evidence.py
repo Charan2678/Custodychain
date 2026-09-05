@@ -5,7 +5,12 @@ from sqlalchemy.orm import Session
 from database import get_db
 import models
 from security.auth import get_current_user, require_role
-from services.custody_service import process_evidence_pipeline
+from services.custody_service import (
+    process_evidence_pipeline,
+    intake_evidence_step1,
+    advance_custody_transfer,
+)
+from services.verifier_service import verify_evidence_integrity
 from services.storage_service import storage
 
 router = APIRouter(prefix="/evidence", tags=["Digital Evidence"])
@@ -16,8 +21,13 @@ class IngestEvidenceRequest(BaseModel):
     exhibit_id: str | None = None
     name: str
     content: str
-    simulate_tamper: bool = True
-    tamper_step: int = 3  # 0 for none/clean, 2-5 for specific handlers
+    step_by_step: bool = False
+    simulate_tamper: bool = False
+    tamper_step: int = 0  # 0 for clean, 2-5 for specific handlers
+
+
+class CustodyTransferRequest(BaseModel):
+    simulate_tamper: bool = False
 
 
 @router.post("")
@@ -38,25 +48,53 @@ def ingest_evidence(
             raise HTTPException(status_code=400, detail="No cases available. Please create a case first.")
         target_case_id = first_case.id
 
-    evidence = process_evidence_pipeline(
+    if payload.step_by_step:
+        # Initial intake only: Step 1 (Collector) executed, evidence in custody awaiting handover
+        evidence = intake_evidence_step1(
+            db=db,
+            evidence_name=payload.name,
+            content=payload.content,
+            case_id=target_case_id,
+            exhibit_id=payload.exhibit_id,
+            created_by=current_user.name,
+        )
+    else:
+        # Full automated lifecycle
+        evidence = process_evidence_pipeline(
+            db=db,
+            evidence_name=payload.name,
+            content=payload.content,
+            case_id=target_case_id,
+            exhibit_id=payload.exhibit_id,
+            simulate_tamper=payload.simulate_tamper,
+            tamper_step=payload.tamper_step,
+            created_by=current_user.name,
+        )
+
+    # Return authoritative verification state for immediate timeline rendering
+    return verify_evidence_integrity(db, evidence.id, auditor_name=current_user.name)
+
+
+@router.post("/{evidence_id}/transfer")
+def transfer_custody(
+    evidence_id: int,
+    payload: CustodyTransferRequest,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Executes a role-enforced custody handover to the next handler in the chain:
+    - Step 1 -> 2: Evidence Officer authorizes transfer to Forensic Analyst
+    - Step 2 -> 3: Forensic Analyst processes in Laboratory / Export Tool
+    - Step 3 -> 4: Transferred to Legal Reviewer
+    - Step 4 -> 5: Sealed into Archive Vault
+    """
+    return advance_custody_transfer(
         db=db,
-        evidence_name=payload.name,
-        content=payload.content,
-        case_id=target_case_id,
-        exhibit_id=payload.exhibit_id,
+        evidence_id=evidence_id,
+        current_user=current_user,
         simulate_tamper=payload.simulate_tamper,
-        tamper_step=payload.tamper_step,
-        created_by=current_user.name,
     )
-    return {
-        "evidence_id": evidence.id,
-        "case_id": evidence.case_id,
-        "exhibit_id": evidence.exhibit_id,
-        "name": evidence.name,
-        "original_hash": evidence.original_hash,
-        "size_bytes": evidence.size_bytes,
-        "status": evidence.status,
-    }
 
 
 @router.get("")

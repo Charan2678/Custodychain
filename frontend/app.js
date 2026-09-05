@@ -288,6 +288,7 @@ async function loadHistory() {
           if (verifyRes.ok) {
             const verifyData = await verifyRes.json();
             renderResults(verifyData, { name: item.name });
+            closeHistory();
             resultsSection.scrollIntoView({ behavior: "smooth" });
           }
         } catch (e) {
@@ -301,35 +302,53 @@ async function loadHistory() {
   }
 }
 
-// Initial load
+// Initial load in background to populate count if needed
 loadHistory();
 
-// ---- History toggle ----
+// ---- History modal ----
 const toggleHistoryBtn = document.getElementById("toggleHistoryBtn");
 const closeHistoryBtn  = document.getElementById("closeHistoryBtn");
-const historySection   = document.getElementById("historySection");
+const historyModal     = document.getElementById("historyModal");
 
-function toggleHistory() {
-  if (!historySection) return;
-  const isHidden = historySection.classList.contains("hidden");
-  if (isHidden) {
-    historySection.classList.remove("hidden");
-    if (toggleHistoryBtn) toggleHistoryBtn.classList.add("active");
-    loadHistory();
-    historySection.scrollIntoView({ behavior: "smooth" });
-  } else {
-    historySection.classList.add("hidden");
-    if (toggleHistoryBtn) toggleHistoryBtn.classList.remove("active");
-  }
+function openHistory() {
+  if (!historyModal) return;
+  historyModal.classList.remove("hidden");
+  if (toggleHistoryBtn) toggleHistoryBtn.classList.add("active");
+  loadHistory();
+}
+
+function closeHistory() {
+  if (!historyModal) return;
+  historyModal.classList.add("hidden");
+  if (toggleHistoryBtn) toggleHistoryBtn.classList.remove("active");
 }
 
 if (toggleHistoryBtn) {
-  toggleHistoryBtn.addEventListener("click", toggleHistory);
+  toggleHistoryBtn.addEventListener("click", () => {
+    if (historyModal && historyModal.classList.contains("hidden")) {
+      openHistory();
+    } else {
+      closeHistory();
+    }
+  });
 }
 
 if (closeHistoryBtn) {
-  closeHistoryBtn.addEventListener("click", () => {
-    if (historySection) historySection.classList.add("hidden");
-    if (toggleHistoryBtn) toggleHistoryBtn.classList.remove("active");
+  closeHistoryBtn.addEventListener("click", closeHistory);
+}
+
+// Close when clicking outside modal card
+if (historyModal) {
+  historyModal.addEventListener("click", (e) => {
+    if (e.target === historyModal) {
+      closeHistory();
+    }
   });
 }
+
+// Close on Escape key
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && historyModal && !historyModal.classList.contains("hidden")) {
+    closeHistory();
+  }
+});

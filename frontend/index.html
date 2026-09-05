@@ -121,18 +121,23 @@
       </div>
     </section>
 
-    <section id="historySection" class="panel history-panel hidden">
-      <div class="timeline-header">
-        <span>Verification History</span>
-        <div style="display: flex; align-items: center; gap: 12px;">
-          <span class="hint" id="historyCount"></span>
-          <button id="closeHistoryBtn" class="btn-close" title="Close history" type="button">✕</button>
+    <!-- History Modal Dialog -->
+    <div id="historyModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-card">
+        <div class="modal-header">
+          <span id="modalTitle" class="modal-title">Verification History</span>
+          <div class="modal-actions">
+            <span class="hint" id="historyCount"></span>
+            <button id="closeHistoryBtn" class="btn-close" title="Close history" type="button">✕</button>
+          </div>
+        </div>
+        <div class="modal-body">
+          <div id="historyList" class="history-list">
+            <div class="history-empty">No runs yet — click Run sample demo or Run verification to begin.</div>
+          </div>
         </div>
       </div>
-      <div id="historyList" class="history-list">
-        <div class="history-empty">No runs yet — click Run sample demo or Run verification to begin.</div>
-      </div>
-    </section>
+    </div>
 
     <footer class="app-footer">CustodyChain v1.0 &nbsp;·&nbsp; Myonsite Hackathon &nbsp;·&nbsp; Built by Charan</footer>
 

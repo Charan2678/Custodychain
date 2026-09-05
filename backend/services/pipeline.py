@@ -4,7 +4,7 @@ from services.handlers import HANDLER_PIPELINE
 import models
 
 
-def run_pipeline(db: Session, evidence_name: str, initial_content: str) -> models.Evidence:
+def run_pipeline(db: Session, evidence_name: str, initial_content: str, simulate_tamper: bool = True) -> models.Evidence:
     """
     Runs the evidence through all 5 handlers in sequence.
     Creates one Evidence row and one CustodyLog row per handler step.
@@ -38,7 +38,10 @@ def run_pipeline(db: Session, evidence_name: str, initial_content: str) -> model
             )
 
         hash_before = compute_hash(current_content)
-        new_content, declared_status = handler_fn(current_content)
+        if handler_name == "Export Tool":
+            new_content, declared_status = handler_fn(current_content, simulate_tamper)
+        else:
+            new_content, declared_status = handler_fn(current_content)
         hash_after = compute_hash(new_content)
 
         log_entry = models.CustodyLog(

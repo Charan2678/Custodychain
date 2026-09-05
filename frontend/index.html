@@ -63,22 +63,57 @@
         </div>
       </section>
 
-      <!-- Action zone -->
-      <section class="action-zone">
-        <div class="evidence-preview">
-          <div class="evidence-preview-label">
-            <span class="dot dot-green"></span>
-            Evidence Content Preview
+      <!-- Input Panel -->
+      <section class="input-panel">
+        <div class="input-panel-grid">
+
+          <div class="input-group">
+            <label class="input-label" for="evidenceName">
+              <span class="label-dot"></span>Evidence Name
+            </label>
+            <input
+              type="text"
+              id="evidenceName"
+              class="input-field"
+              placeholder="Case-2026-0912-Exhibit-A"
+              autocomplete="off"
+            />
           </div>
-          <div class="evidence-preview-content mono" id="evidencePreview">
-            CASE_FILE_2026_0912
-            Suspect device seized at 14:02.
-            Hash chain begins here.
+
+          <div class="input-group input-group--full">
+            <label class="input-label" for="evidenceContent">
+              <span class="label-dot"></span>Evidence Content
+            </label>
+            <textarea
+              id="evidenceContent"
+              class="input-field input-textarea"
+              rows="4"
+              placeholder="Paste or type the evidence text here…&#10;&#10;Example:&#10;CASE_FILE_2026_0912&#10;Suspect device seized at 14:02.&#10;Hash chain begins here."
+            ></textarea>
           </div>
+
+          <div class="input-group input-group--full">
+            <label class="toggle-row" for="tamperToggle">
+              <div class="toggle-switch">
+                <input type="checkbox" id="tamperToggle" checked />
+                <span class="toggle-track">
+                  <span class="toggle-thumb"></span>
+                </span>
+              </div>
+              <div class="toggle-info">
+                <span class="toggle-label">Simulate tamper at Export Tool</span>
+                <span class="toggle-hint" id="tamperHint">
+                  ON — Export Tool will silently alter line endings and declare success
+                </span>
+              </div>
+            </label>
+          </div>
+
         </div>
+
         <button id="runDemoBtn" class="run-btn">
-          <span class="run-btn-icon">▶</span>
-          <span id="runBtnText">Run Demo</span>
+          <span class="run-btn-icon" id="runBtnIcon">▶</span>
+          <span id="runBtnText">Run Verification</span>
           <span class="run-btn-glow"></span>
         </button>
       </section>

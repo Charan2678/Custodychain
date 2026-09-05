@@ -5,9 +5,6 @@
 
 const API_BASE = "http://localhost:8000";
 
-const SAMPLE_CONTENT =
-  "CASE_FILE_2026_0912\nSuspect device seized at 14:02.\nHash chain begins here.";
-
 // ---- Element refs ----
 const runBtn      = document.getElementById("runDemoBtn");
 const runBtnText  = document.getElementById("runBtnText");
@@ -24,22 +21,49 @@ const metaName    = document.getElementById("metaName");
 const metaTime    = document.getElementById("metaTime");
 const legend      = document.getElementById("legend");
 
+// ---- Tamper toggle hint ----
+const tamperToggle = document.getElementById("tamperToggle");
+const tamperHint   = document.getElementById("tamperHint");
+
+function updateTamperHint() {
+  if (tamperToggle.checked) {
+    tamperHint.textContent = "ON \u2014 Export Tool will silently alter line endings and declare success";
+    tamperHint.style.color = "var(--red)";
+  } else {
+    tamperHint.textContent = "OFF \u2014 Export Tool will pass evidence through unchanged (expect CHAIN_INTACT)";
+    tamperHint.style.color = "var(--green)";
+  }
+}
+
+tamperToggle.addEventListener("change", updateTamperHint);
+updateTamperHint(); // set correct hint on page load
+
 // ---- Run Demo ----
 runBtn.addEventListener("click", runDemo);
 
 async function runDemo() {
+  const name           = document.getElementById("evidenceName").value.trim() || "Untitled-Evidence";
+  const content        = document.getElementById("evidenceContent").value.trim();
+  const simulateTamper = tamperToggle.checked;
+
+  if (!content) {
+    const ta = document.getElementById("evidenceContent");
+    ta.style.borderColor = "var(--red)";
+    ta.style.boxShadow   = "0 0 0 3px rgba(255,71,87,0.2)";
+    setTimeout(() => { ta.style.borderColor = ""; ta.style.boxShadow = ""; }, 1500);
+    ta.focus();
+    return;
+  }
+
   setLoading(true);
   clearResults();
 
   try {
-    // Step 1: Create evidence & run it through the pipeline
+    // Step 1: create evidence and run it through the pipeline
     const createRes = await fetch(`${API_BASE}/evidence`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: "Case-2026-0912-Exhibit-A",
-        content: SAMPLE_CONTENT,
-      }),
+      body: JSON.stringify({ name, content, simulate_tamper: simulateTamper }),
     });
 
     if (!createRes.ok) {

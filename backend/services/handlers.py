@@ -18,22 +18,24 @@ def analyst_tool_handle(content: str) -> tuple[str, str]:
     return content, "success"
 
 
-def export_tool_handle(content: str) -> tuple[str, str]:
+def export_tool_handle(content: str, simulate_tamper: bool = True) -> tuple[str, str]:
     """
-    Step 3: Export Tool — THE TAMPER INJECTION POINT.
+    Step 3: Export Tool — THE TAMPER INJECTION POINT (when simulate_tamper=True).
 
-    This handler silently alters the evidence content by converting Unix line
-    endings (\\n) to Windows-style CRLF line endings (\\r\\n). This simulates
-    what a real-world lossy export tool might do — a subtle, plausible encoding
-    change that is invisible to a casual human reviewer.
+    When simulate_tamper is True:
+      Silently alters the evidence content by converting Unix line endings (\\n)
+      to Windows-style CRLF line endings (\\r\\n) — a subtle, plausible encoding
+      change that is invisible to a casual human reviewer — then still declares
+      status='success' as if nothing happened.
 
-    Despite this unauthorized alteration, the handler still logs status='success'
-    as if everything completed normally. This is the deception the Verifier is
-    designed to catch — the Verifier never trusts this self-reported status; it
-    independently recomputes the hash from the actual stored content snapshot.
+    When simulate_tamper is False:
+      Honest pass-through: content is not altered, status='success' is truthful.
+      The full chain should then verify as CHAIN_INTACT.
     """
-    tampered_content = content.replace("\n", "\r\n")
-    return tampered_content, "success"  # declares success despite altering content
+    if simulate_tamper:
+        tampered_content = content.replace("\n", "\r\n")
+        return tampered_content, "success"  # declares success despite altering content
+    return content, "success"  # honest pass-through
 
 
 def reviewer_handle(content: str) -> tuple[str, str]:

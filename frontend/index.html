@@ -45,7 +45,8 @@
         </div>
         <span class="menu-chevron">▾</span>
         <div class="role-dropdown hidden" id="roleDropdown">
-          <div class="dropdown-header">Switch Active Role</div>
+          <div class="dropdown-header">Demo role</div>
+          <div class="dropdown-subtext">Switch persona for testing</div>
           <button class="role-option" data-role="EVIDENCE_OFFICER">Evidence Officer</button>
           <button class="role-option" data-role="FORENSIC_ANALYST">Forensic Analyst</button>
           <button class="role-option" data-role="AUDITOR">Auditor</button>
@@ -58,31 +59,39 @@
   <!-- MAIN TWO-PANE WORKSPACE -->
   <div class="workspace-layout">
 
-    <!-- LEFT SIDEBAR: EXHIBITS & ACTIONS -->
+    <!-- LEFT SIDEBAR: MINIMAL EVIDENCE SELECTOR -->
     <aside class="workspace-sidebar">
       <div class="sidebar-actions">
         <button id="runSampleBtn" class="btn-sidebar-primary" title="Cycle through real-world forensic exhibits">
           <span class="btn-symbol">▶</span>
           <span>Quick Demo Scenario</span>
         </button>
-        <button id="newEvidenceBtn" class="btn-sidebar-secondary" title="Ingest new exhibit artifact">
-          <span class="btn-symbol">+</span>
-          <span>Ingest Evidence</span>
+        <button id="newEvidenceBtn" class="btn-sidebar-secondary" title="Ingest new exhibit artifact or simulate tamper">
+          <span class="btn-symbol">⚙</span>
+          <span>Simulation / Ingestion</span>
         </button>
         <button id="openAuditBtn" class="btn-sidebar-ghost" title="View immutable system audit logs">
           <span class="btn-symbol">≡</span>
-          <span>System Audit Trail</span>
+          <span>Audit Trail</span>
         </button>
       </div>
 
       <div class="sidebar-section-header">
-        <span class="section-title">Case Exhibits</span>
+        <span class="section-title">Evidence</span>
         <span class="section-count" id="sidebarExhibitCount">0 items</span>
       </div>
 
+      <div class="sidebar-search-wrap">
+        <input type="text" id="sidebarSearch" placeholder="Search exhibits..." class="sidebar-search-input" />
+      </div>
+
       <div class="exhibit-nav-list" id="exhibitNavList">
-        <!-- Dynamically loaded exhibits from history -->
-        <div class="loading-state">Loading exhibits...</div>
+        <!-- Dynamically populated minimal items -->
+        <div class="loading-state">Loading evidence...</div>
+      </div>
+
+      <div class="sidebar-expand-wrap hidden" id="sidebarExpandWrap">
+        <button id="toggleAllExhibitsBtn" class="btn-view-all">View all 0 evidence</button>
       </div>
 
       <div class="sidebar-footer">
@@ -96,111 +105,213 @@
       </div>
     </aside>
 
-    <!-- RIGHT MAIN: CONTEXTUAL WORKSPACE CANVAS -->
+    <!-- RIGHT MAIN: PROGRESSIVE DISCLOSURE WORKSPACE -->
     <main class="workspace-canvas">
 
-      <!-- TOP EXHIBIT HEADER & ACTION BAR -->
+      <!-- LEVEL 1: WHAT IS HAPPENING? (CLEAN TITLE & PRIMARY ACTIONS) -->
       <section class="canvas-header-bar">
         <div class="exhibit-headline">
-          <div class="exhibit-breadcrumbs">
-            <span id="headerCaseNumber">CASE-2026-0912</span>
-            <span class="slash">/</span>
-            <span id="headerExhibitId">EX-9921</span>
-          </div>
-          <h2 class="exhibit-title" id="headerExhibitTitle">Select or run an exhibit to begin</h2>
-          <div class="exhibit-meta-pills" id="headerMetaPills">
-            <span class="meta-pill" id="metaTimestamp">Acquired: —</span>
-            <span class="meta-pill" id="metaCustodian">Custodian: Charan</span>
-            <span class="meta-pill font-mono" id="metaHash">Hash: —</span>
+          <h1 class="exhibit-title" id="headerExhibitTitle">Select or run an exhibit to begin</h1>
+          <div class="exhibit-meta-line">
+            <span id="headerCaseNumber">Case-2026-0912</span>
+            <span class="meta-dot">·</span>
+            <span id="headerExhibitId">Evidence</span>
+            <span class="meta-dot">·</span>
+            <span class="status-summary-tag" id="headerStatusTag">Ready</span>
           </div>
         </div>
 
         <div class="exhibit-controls">
           <button id="verifyBtn" class="btn-action-primary" title="Execute independent multi-vector verification">
             <span class="btn-symbol">⟳</span>
-            <span id="verifyBtnText">Verify Integrity</span>
+            <span id="verifyBtnText">Verify</span>
+          </button>
+          <button id="explainBtn" class="btn-action-secondary" title="View plain-English breakdown of chain status">
+            <span class="btn-symbol">💬</span>
+            <span>Explain</span>
           </button>
           <button id="downloadPdfBtn" class="btn-action-secondary" title="Export Court-Admissible Chain-of-Custody Certificate">
             <span class="btn-symbol">⇩</span>
-            <span>Court Certificate (PDF)</span>
+            <span>Report</span>
           </button>
           <button id="toggleSimulatorBtn" class="btn-action-ghost" title="Configure simulated tamper scenario">
             <span class="btn-symbol">⚙</span>
-            <span>Scenario Controls</span>
+            <span>Scenario</span>
           </button>
         </div>
       </section>
 
-      <!-- SCENARIO & TAMPER SIMULATOR DRAWER (CALM & COLLAPSIBLE) -->
-      <section class="scenario-drawer hidden" id="scenarioDrawer">
-        <div class="drawer-header">
-          <span class="drawer-title">Tamper Simulation & Custom Ingestion</span>
-          <button class="drawer-close" id="closeDrawerBtn">✕</button>
-        </div>
-        <div class="drawer-body">
-          <div class="form-row">
-            <div class="form-group flex-2">
-              <label for="evidenceName">Exhibit Name / Description</label>
-              <input type="text" id="evidenceName" placeholder="Case-2026-Exhibit-A" />
+      <!-- LEVEL 3 PROGRESSIVE DISCLOSURE: COLLAPSIBLE DETAILS -->
+      <div class="details-accordion" id="detailsAccordion">
+        <button class="details-toggle-btn" id="toggleDetailsBtn" type="button">
+          <span class="toggle-left">
+            <span class="details-chevron" id="detailsChevron">▸</span>
+            <span>Details</span>
+          </span>
+          <span class="details-preview" id="detailsPreview">Acquired: — · Custodian: Charan</span>
+        </button>
+        <div class="details-body hidden" id="detailsContent">
+          <div class="details-grid">
+            <div class="detail-item">
+              <span class="detail-label">Acquisition Time</span>
+              <span class="detail-value" id="metaTimestamp">—</span>
             </div>
-            <div class="form-group flex-2">
-              <label for="tamperStepSelect">Inject Tamper At Handler</label>
-              <select id="tamperStepSelect">
-                <option value="3">Step 3 — Export Tool (Silent CRLF Alteration)</option>
-                <option value="2">Step 2 — Analyst Tool (Unauthorized Metadata Tag)</option>
-                <option value="4">Step 4 — Reviewer (Unlogged Redaction)</option>
-                <option value="5">Step 5 — Archive (Storage Bit-Rot)</option>
-                <option value="0">None — Pure Verified Intact Chain</option>
-              </select>
+            <div class="detail-item">
+              <span class="detail-label">Custodian</span>
+              <span class="detail-value" id="metaCustodian">Charan</span>
             </div>
-            <div class="form-group flex-1 checkbox-group">
-              <label class="checkbox-label" for="tamperToggle">
-                <input type="checkbox" id="tamperToggle" checked />
-                <span>Simulate silent tamper</span>
-              </label>
+            <div class="detail-item">
+              <span class="detail-label">Baseline SHA-256 Hash</span>
+              <span class="detail-value font-mono" id="metaHash">—</span>
             </div>
-          </div>
-          <div class="form-group">
-            <label for="evidenceContent">Digital Artifact Content (Simulated Raw Stream)</label>
-            <textarea id="evidenceContent" rows="3" placeholder="Enter or paste raw exhibit content..."></textarea>
-          </div>
-          <div class="drawer-actions">
-            <button id="runCustomBtn" class="btn-sidebar-primary">
-              <span>Execute Custody Pipeline</span>
-            </button>
+            <div class="detail-item">
+              <span class="detail-label">Storage Integrity</span>
+              <span class="detail-value" id="metaStorageSpec">WORM Local Storage</span>
+            </div>
           </div>
         </div>
-      </section>
+      </div>
 
-      <!-- AUTHORITATIVE VERDICT BANNER -->
+      <!-- LEVEL 1: QUIET VERDICT SUMMARY (REFINED, CALM, NOT FULL SCREAMING RED) -->
       <section class="verdict-banner-card hidden" id="verdictBanner">
         <div class="verdict-card-body">
-          <div class="verdict-status-badge" id="verdictStatusBadge">VERIFIED</div>
+          <div class="verdict-icon-wrap" id="verdictIcon">●</div>
           <div class="verdict-content">
-            <h3 class="verdict-title" id="verdictTitle">Chain Intact · All Handlers Verified</h3>
+            <div class="verdict-headline-row">
+              <h2 class="verdict-title" id="verdictTitle">Chain intact</h2>
+              <span class="verdict-break-point" id="verdictBreakPoint"></span>
+            </div>
             <p class="verdict-explanation" id="verdictExplanation">
-              Authoritative independent verification confirmed: storage artifacts match baseline SHA-256, Ed25519 digital signatures are valid, and event hash linkages are unbroken.
+              All 5 handlers independently verified. Cryptographic signatures and ledger continuity valid.
             </p>
+          </div>
+          <div class="verdict-quick-action">
+            <button class="btn-verdict-explain" id="verdictExplainBtn">View details</button>
           </div>
         </div>
       </section>
 
-      <!-- HANDLER PIPELINE TIMELINE -->
+      <!-- LEVEL 2: CONVERSATIONAL "WHY IS THIS BROKEN / INTACT?" CARD -->
+      <section class="explanation-card hidden" id="explanationCard">
+        <div class="explanation-header">
+          <div class="explanation-title-wrap">
+            <span class="explanation-icon">✦</span>
+            <span class="explanation-title" id="explanationTitle">Integrity Analysis</span>
+          </div>
+          <button class="explanation-close" id="closeExplanationBtn">✕</button>
+        </div>
+        <div class="explanation-body" id="explanationBody">
+          <!-- Populated dynamically with human-readable explanation -->
+        </div>
+      </section>
+
+      <!-- LEVEL 2: CUSTODY CHAIN TIMELINE -->
       <section class="timeline-container">
         <div class="timeline-subhead">
-          <span class="subhead-title">Custody Chain Timeline</span>
-          <span class="subhead-desc">Independent mathematical recomputation across all handlers</span>
+          <div class="subhead-left">
+            <span class="subhead-title">Custody Chain</span>
+            <span class="subhead-dot">·</span>
+            <span class="subhead-desc">Independently verified</span>
+          </div>
+          <div class="subhead-right">
+            <button id="howVerifiedBtn" class="link-btn" type="button">How was this verified?</button>
+          </div>
         </div>
 
         <div class="timeline-cards" id="timelineCards">
-          <!-- Populated dynamically -->
+          <!-- Populated dynamically with simplified cards -->
           <div class="empty-timeline-notice">
-            Click <strong>"Quick Demo Scenario"</strong> in the sidebar to simulate digital evidence moving through the 5-stage custody pipeline.
+            Click <strong>"Quick Demo Scenario"</strong> to simulate digital evidence moving through the custody pipeline.
           </div>
         </div>
       </section>
 
     </main>
+  </div>
+
+  <!-- SIMULATION / CUSTOM INGESTION MODAL (MOVED BEHIND MODAL SO IT NEVER CLUTTERS NORMAL VIEW) -->
+  <div class="modal-overlay hidden" id="scenarioModal">
+    <div class="modal-card modal-card-compact">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <h3 class="modal-title">Simulation &amp; Test Scenario</h3>
+          <span class="modal-subtitle">Inject silent mutations to test independent verification</span>
+        </div>
+        <button class="modal-close" id="closeDrawerBtn">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group flex-2">
+            <label for="evidenceName">Exhibit Name / Description</label>
+            <input type="text" id="evidenceName" placeholder="Case-2026-Exhibit-A" />
+          </div>
+          <div class="form-group flex-2">
+            <label for="tamperStepSelect">Inject Tamper At Handler</label>
+            <select id="tamperStepSelect">
+              <option value="3">Step 3 — Export Tool (Silent CRLF Alteration)</option>
+              <option value="2">Step 2 — Analyst Tool (Unauthorized Metadata Tag)</option>
+              <option value="4">Step 4 — Reviewer (Unlogged Redaction)</option>
+              <option value="5">Step 5 — Archive (Storage Bit-Rot)</option>
+              <option value="0">None — Pure Verified Intact Chain</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group flex-1 checkbox-group">
+            <label class="checkbox-label" for="tamperToggle">
+              <input type="checkbox" id="tamperToggle" checked />
+              <span>Simulate silent tamper at designated handler</span>
+            </label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="evidenceContent">Digital Artifact Content (Simulated Raw Stream)</label>
+          <textarea id="evidenceContent" rows="4" placeholder="Enter or paste raw exhibit content..."></textarea>
+        </div>
+        <div class="modal-actions-bar">
+          <button id="cancelModalBtn" class="btn-sidebar-ghost">Cancel</button>
+          <button id="runCustomBtn" class="btn-sidebar-primary">
+            <span>Execute Pipeline</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- "HOW WAS THIS VERIFIED?" MODAL -->
+  <div class="modal-overlay hidden" id="howVerifiedModal">
+    <div class="modal-card modal-card-compact">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <h3 class="modal-title">How CustodyChain Verifies Integrity</h3>
+          <span class="modal-subtitle">3 independent cryptographic checks executed at every handler</span>
+        </div>
+        <button class="modal-close" id="closeHowVerifiedBtn">✕</button>
+      </div>
+      <div class="modal-body verification-explainer-body">
+        <div class="explainer-step">
+          <div class="explainer-num">1</div>
+          <div class="explainer-content">
+            <h4>Independent Mathematical Recomputation</h4>
+            <p>CustodyChain does not rely on self-declared logs. It pulls the raw stored artifact byte-stream from disk and recomputes the SHA-256 hash independently. If a single bit or CRLF newline was altered, the hash will not match.</p>
+          </div>
+        </div>
+        <div class="explainer-step">
+          <div class="explainer-num">2</div>
+          <div class="explainer-content">
+            <h4>Ed25519 Cryptographic Signatures</h4>
+            <p>Every handler transition is signed with an asymmetric Ed25519 private key belonging to the designated custodian or automated tool. The public key verifies identity, ensuring non-repudiation and detecting forged records.</p>
+          </div>
+        </div>
+        <div class="explainer-step">
+          <div class="explainer-num">3</div>
+          <div class="explainer-content">
+            <h4>Previous-Event Hash Continuity (Ledger Link)</h4>
+            <p>Each event payload references the cryptographic hash of the preceding event, creating an unbroken chain of custody. If any prior record is retroactively deleted or altered, the entire subsequent chain fails.</p>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- AUDIT TRAIL MODAL -->

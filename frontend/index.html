@@ -14,6 +14,9 @@
   <!-- TOP NAVIGATION BAR -->
   <header class="workspace-nav">
     <div class="nav-left">
+      <button id="toggleSidebarBtn" class="btn-sidebar-collapse" title="Toggle Evidence Sidebar (Fit view to left)">
+        <span class="collapse-icon">☰</span>
+      </button>
       <div class="app-brand">
         <span class="brand-symbol">◈</span>
         <span class="brand-name">CustodyChain</span>
@@ -95,6 +98,12 @@
       </div>
 
       <div class="sidebar-footer">
+        <div class="theme-toggle-wrap">
+          <button id="themeToggleBtn" class="btn-theme-toggle" type="button" title="Switch Theme (Dark / Light)">
+            <span class="theme-icon" id="themeIcon">🌙</span>
+            <span class="theme-label" id="themeLabel">Dark Theme</span>
+          </button>
+        </div>
         <div class="footer-crypto-spec">
           <span class="spec-item">SHA-256</span>
           <span class="spec-dot">·</span>

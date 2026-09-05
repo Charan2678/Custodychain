@@ -115,6 +115,12 @@ const userMenuBtn        = document.getElementById("userMenuBtn");
 const roleDropdown       = document.getElementById("roleDropdown");
 const navUserRole        = document.getElementById("navUserRole");
 
+const themeToggleBtn     = document.getElementById("themeToggleBtn");
+const themeIcon          = document.getElementById("themeIcon");
+const themeLabel         = document.getElementById("themeLabel");
+const toggleSidebarBtn   = document.getElementById("toggleSidebarBtn");
+const workspaceSidebar   = document.querySelector(".workspace-sidebar");
+
 
 // ---- Initialization ----
 document.addEventListener("DOMContentLoaded", () => {
@@ -124,6 +130,8 @@ document.addEventListener("DOMContentLoaded", () => {
   setupSearch();
   setupModals();
   setupDetailsToggle();
+  setupTheme();
+  setupSidebarToggle();
 });
 
 // Setup Modals & Dialogs
@@ -170,6 +178,46 @@ function setupModals() {
   closeExplanationBtn.addEventListener("click", () => {
     explanationCard.classList.add("hidden");
   });
+}
+
+// Sidebar Collapse / Expand Toggle
+function setupSidebarToggle() {
+  if (!toggleSidebarBtn || !workspaceSidebar) return;
+  toggleSidebarBtn.addEventListener("click", () => {
+    const isCollapsed = workspaceSidebar.classList.toggle("collapsed");
+    toggleSidebarBtn.title = isCollapsed ? "Expand Evidence Sidebar" : "Collapse Evidence Sidebar";
+  });
+}
+
+// Light / Dark Theme Controller
+function setupTheme() {
+  if (!themeToggleBtn) return;
+  
+  const savedTheme = localStorage.getItem("custodychain_theme");
+  if (savedTheme === "light") {
+    applyTheme("light");
+  } else {
+    applyTheme("dark");
+  }
+
+  themeToggleBtn.addEventListener("click", () => {
+    const isCurrentlyLight = document.body.classList.contains("theme-light");
+    const nextTheme = isCurrentlyLight ? "dark" : "light";
+    applyTheme(nextTheme);
+    localStorage.setItem("custodychain_theme", nextTheme);
+  });
+}
+
+function applyTheme(theme) {
+  if (theme === "light") {
+    document.body.classList.add("theme-light");
+    if (themeIcon) themeIcon.textContent = "☀️";
+    if (themeLabel) themeLabel.textContent = "Light Theme";
+  } else {
+    document.body.classList.remove("theme-light");
+    if (themeIcon) themeIcon.textContent = "🌙";
+    if (themeLabel) themeLabel.textContent = "Dark Theme";
+  }
 }
 
 // Collapsible Evidence Details (Level 3)
@@ -368,7 +416,20 @@ function renderVerificationResults(data) {
   currentVerificationData = data;
 
   const isIntact = data.final_verdict === "CHAIN_INTACT";
-  const firstBreak = data.first_break;
+  // Derive first broken step if not explicitly keyed in response
+  let firstBreak = data.first_break;
+  if (!firstBreak && data.steps) {
+    firstBreak = data.steps.find(s => !s.verified);
+    if (firstBreak && !firstBreak.reason) {
+      if (firstBreak.signature_valid === false) {
+        firstBreak.reason = "SIGNATURE_INVALID";
+      } else if (firstBreak.ledger_link_valid === false) {
+        firstBreak.reason = "LEDGER_LINK_BROKEN";
+      } else {
+        firstBreak.reason = "STORAGE_HASH_MISMATCH";
+      }
+    }
+  }
 
   // Level 1: What is happening?
   headerExhibitTitle.textContent = data.evidence_name;
@@ -416,7 +477,19 @@ function renderVerificationResults(data) {
 // Render Conversational Explanation ("Why is this broken / intact?")
 function renderExplanation(data) {
   const isIntact = data.final_verdict === "CHAIN_INTACT";
-  const firstBreak = data.first_break;
+  let firstBreak = data.first_break;
+  if (!firstBreak && data.steps) {
+    firstBreak = data.steps.find(s => !s.verified);
+    if (firstBreak && !firstBreak.reason) {
+      if (firstBreak.signature_valid === false) {
+        firstBreak.reason = "SIGNATURE_INVALID";
+      } else if (firstBreak.ledger_link_valid === false) {
+        firstBreak.reason = "LEDGER_LINK_BROKEN";
+      } else {
+        firstBreak.reason = "STORAGE_HASH_MISMATCH";
+      }
+    }
+  }
 
   if (isIntact) {
     explanationTitle.textContent = "Integrity Analysis: Chain Intact";

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="CustodyChain — Multi-Handler Evidence Integrity Verification. Cryptographically tracks and verifies digital evidence across a full handling pipeline." />
+  <title>CustodyChain — Evidence Integrity Verification</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- Background grid -->
+  <div class="bg-grid"></div>
+
+  <div class="page-wrapper">
+
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <div class="logo-icon">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+            <path d="M14 2L3 8v12l11 6 11-6V8L14 2z" stroke="#00d4ff" stroke-width="1.5" fill="none"/>
+            <path d="M14 2v18M3 8l11 6 11-6" stroke="#00d4ff" stroke-width="1.5" opacity="0.5"/>
+            <circle cx="14" cy="14" r="3" fill="#00d4ff"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="logo-text">CustodyChain</h1>
+          <p class="logo-sub">Multi-Handler Evidence Integrity Verification</p>
+        </div>
+      </div>
+      <div class="header-right">
+        <span class="badge-protocol">SHA-256</span>
+        <span class="badge-protocol">FORENSIC SIM</span>
+      </div>
+    </header>
+
+    <!-- Main content -->
+    <main class="main">
+
+      <!-- Info Panel -->
+      <section class="info-panel">
+        <div class="info-item">
+          <span class="info-label">Pipeline</span>
+          <span class="info-value">5 Handlers</span>
+        </div>
+        <div class="info-divider"></div>
+        <div class="info-item">
+          <span class="info-label">Hash Algorithm</span>
+          <span class="info-value mono">SHA-256</span>
+        </div>
+        <div class="info-divider"></div>
+        <div class="info-item">
+          <span class="info-label">Tamper Injected At</span>
+          <span class="info-value tamper-tag">Step 3 — Export Tool</span>
+        </div>
+        <div class="info-divider"></div>
+        <div class="info-item">
+          <span class="info-label">Verification Mode</span>
+          <span class="info-value">Independent Recompute</span>
+        </div>
+      </section>
+
+      <!-- Action zone -->
+      <section class="action-zone">
+        <div class="evidence-preview">
+          <div class="evidence-preview-label">
+            <span class="dot dot-green"></span>
+            Evidence Content Preview
+          </div>
+          <div class="evidence-preview-content mono" id="evidencePreview">
+            CASE_FILE_2026_0912
+            Suspect device seized at 14:02.
+            Hash chain begins here.
+          </div>
+        </div>
+        <button id="runDemoBtn" class="run-btn">
+          <span class="run-btn-icon">▶</span>
+          <span id="runBtnText">Run Demo</span>
+          <span class="run-btn-glow"></span>
+        </button>
+      </section>
+
+      <!-- Verdict Banner -->
+      <div id="verdictBanner" class="verdict-banner hidden">
+        <div class="verdict-icon" id="verdictIcon"></div>
+        <div class="verdict-content">
+          <div class="verdict-title" id="verdictTitle"></div>
+          <div class="verdict-sub" id="verdictSub"></div>
+        </div>
+        <div class="verdict-pulse" id="verdictPulse"></div>
+      </div>
+
+      <!-- Evidence Meta -->
+      <div id="evidenceMeta" class="evidence-meta hidden">
+        <span class="meta-label">Evidence ID:</span>
+        <span class="meta-value mono" id="metaId">—</span>
+        <span class="meta-sep">·</span>
+        <span class="meta-label">Name:</span>
+        <span class="meta-value mono" id="metaName">—</span>
+        <span class="meta-sep">·</span>
+        <span class="meta-label">Checked:</span>
+        <span class="meta-value mono" id="metaTime">—</span>
+      </div>
+
+      <!-- Timeline -->
+      <section id="timelineSection" class="timeline-section hidden">
+        <div class="timeline-header">
+          <span class="timeline-label">Chain of Custody</span>
+          <span class="timeline-hint">Click any step to inspect hashes</span>
+        </div>
+        <div id="timeline" class="timeline"></div>
+      </section>
+
+      <!-- Legend -->
+      <div id="legend" class="legend hidden">
+        <div class="legend-item"><span class="status-dot verified"></span> Verified — hash matches expected</div>
+        <div class="legend-item"><span class="status-dot broken"></span> Broken — unauthorized content change detected</div>
+        <div class="legend-item"><span class="status-dot downstream"></span> Downstream of break — chain already compromised</div>
+      </div>
+
+    </main>
+
+    <footer class="footer">
+      <span>CustodyChain v1.0 &nbsp;·&nbsp; Myonsite Hackathon &nbsp;·&nbsp; Built by Charan</span>
+    </footer>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

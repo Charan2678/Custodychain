@@ -1,7 +1,6 @@
-/* ================================================================
-   CustodyChain — app.js
-   Handles: form input, API calls, timeline rendering, expandable rows
-   ================================================================ */
+/* ==========================================================================
+   CustodyChain — Modern Calm Forensic Workspace Controller
+   ========================================================================== */
 
 const API_BASE = "http://localhost:8000";
 
@@ -11,24 +10,24 @@ const FORENSIC_SCENARIOS = [
     title: "WhatsApp SQLite Chat DB",
     generate: (caseId, time) =>
       `CASE_REF: #2026-${caseId}-MOB\nEXHIBIT: WhatsApp SQLite Chat Database\nEXTRACTION_TIME: ${time}\n[14:00:01] Suspect: Meeting at warehouse confirmed.\n[14:01:23] Accomplice: Bring the encrypted drive.\nMD5_SOURCE: d41d8cd98f00b204e9800998ecf8427e`,
-    tamperStep: 2,
-    tamperLabel: "Step 2 — Analyst Tool",
+    tamperStep: 3,
+    tamperLabel: "Step 3 — Export Tool (Silent CRLF)",
   },
   {
     prefix: "Case-2026-FinFraud-Ledger-TX",
     title: "Wire Transfer Settlement Ledger",
     generate: (caseId, time) =>
       `TRANSACTION_BATCH_AUDIT: TX-${caseId}-WIRE\nBATCH_TIMESTAMP: ${time}\nORIGIN_ROUTING: 021000021 (Chase Bank NY)\nBENEFICIARY_IBAN: GB29NWBK60161331926819\nTRANSFERRED_AMOUNT_USD: $3,750,000.00\nSETTLEMENT_STATUS: CLEARED_BY_FEDWIRE`,
-    tamperStep: 3,
-    tamperLabel: "Step 3 — Export Tool",
+    tamperStep: 2,
+    tamperLabel: "Step 2 — Analyst Tool (Unauthorized Tag)",
   },
   {
     prefix: "Case-2026-CCTV-FrameCheck-North",
-    title: "CCTV Surveillance Checksum",
+    title: "CCTV Surveillance Stream Checksum",
     generate: (caseId, time) =>
       `SURVEILLANCE_STREAM: CAM-04-NORTH-GATE\nFRAME_SYNC_TIME: ${time}\nKEYFRAME_HASH: 7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d\nOFFICER_BADGE: SFPD-0892\nTAMPER_SEAL: PHYSICAL_ZIP_LOCK_TAG_${caseId}`,
     tamperStep: 4,
-    tamperLabel: "Step 4 — Reviewer",
+    tamperLabel: "Step 4 — Reviewer (Unlogged Redaction)",
   },
   {
     prefix: "Case-2026-NVMe-DiskImage-Raw",
@@ -36,7 +35,7 @@ const FORENSIC_SCENARIOS = [
     generate: (caseId, time) =>
       `BITSTREAM_DISK_IMAGE: PHYSICAL_DRIVE_${caseId}\nIMAGING_TOOL: FTK_Imager_v4.7_HARDWARE_WRITE_BLOCKED\nTIME_ACQUIRED: ${time}\nPARTITION_TABLE: GPT / NTFS_VOLUME_GUID\nSECTOR_RANGE: LBA 0x00000000 - 0x7FFFFFFF`,
     tamperStep: 5,
-    tamperLabel: "Step 5 — Archive",
+    tamperLabel: "Step 5 — Archive (Storage Bit-Rot)",
   },
   {
     prefix: "Case-2026-HSM-Encrypted-Keystore",
@@ -44,115 +43,246 @@ const FORENSIC_SCENARIOS = [
     generate: (caseId, time) =>
       `VAULT_KEYSTORE: HSM-LUNA-PCIe-SLOT-${caseId}\nCERTIFICATE_ISSUER: Forensic Root Authority CA\nVALIDATED_AT: ${time}\nALGORITHM: RSA-4096 / SHA-256\nSTATUS: VALID_UNCOMPROMISED_CHAIN`,
     tamperStep: 0,
-    tamperLabel: "None — Chain Intact",
+    tamperLabel: "None — Verified Chain Intact",
   },
 ];
 
-let currentScenarioIndex = 0;
+let scenarioIndex = 0;
+let currentEvidenceId = null;
+let currentCaseId = 1;
 
-function getNextScenario() {
-  const scenario = FORENSIC_SCENARIOS[currentScenarioIndex];
-  currentScenarioIndex = (currentScenarioIndex + 1) % FORENSIC_SCENARIOS.length;
-  const caseId = Math.floor(Math.random() * 9000 + 1000);
+// Element references
+const runSampleBtn      = document.getElementById("runSampleBtn");
+const newEvidenceBtn    = document.getElementById("newEvidenceBtn");
+const openAuditBtn      = document.getElementById("openAuditBtn");
+const closeAuditModalBtn= document.getElementById("closeAuditModalBtn");
+const auditModal        = document.getElementById("auditModal");
+const auditTableBody    = document.getElementById("auditTableBody");
+
+const scenarioDrawer    = document.getElementById("scenarioDrawer");
+const toggleSimulatorBtn= document.getElementById("toggleSimulatorBtn");
+const closeDrawerBtn    = document.getElementById("closeDrawerBtn");
+const runCustomBtn      = document.getElementById("runCustomBtn");
+
+const verifyBtn         = document.getElementById("verifyBtn");
+const verifyBtnText     = document.getElementById("verifyBtnText");
+const downloadPdfBtn    = document.getElementById("downloadPdfBtn");
+
+const exhibitNavList    = document.getElementById("exhibitNavList");
+const sidebarExhibitCount = document.getElementById("sidebarExhibitCount");
+
+const headerCaseNumber  = document.getElementById("headerCaseNumber");
+const headerExhibitId   = document.getElementById("headerExhibitId");
+const headerExhibitTitle= document.getElementById("headerExhibitTitle");
+const metaTimestamp     = document.getElementById("metaTimestamp");
+const metaCustodian     = document.getElementById("metaCustodian");
+const metaHash          = document.getElementById("metaHash");
+
+const verdictBanner     = document.getElementById("verdictBanner");
+const verdictStatusBadge= document.getElementById("verdictStatusBadge");
+const verdictTitle      = document.getElementById("verdictTitle");
+const verdictExplanation= document.getElementById("verdictExplanation");
+const timelineCards     = document.getElementById("timelineCards");
+
+const userMenuBtn       = document.getElementById("userMenuBtn");
+const roleDropdown      = document.getElementById("roleDropdown");
+const navUserRole       = document.getElementById("navUserRole");
+const globalSearch      = document.getElementById("globalSearch");
+
+
+// ---- Init & Event Listeners ----
+document.addEventListener("DOMContentLoaded", () => {
+  loadExhibitList();
+  loadCases();
+  setupRoleMenu();
+  setupSearch();
+});
+
+// User Role Dropdown Menu
+function setupRoleMenu() {
+  userMenuBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    roleDropdown.classList.toggle("hidden");
+  });
+
+  document.addEventListener("click", () => {
+    roleDropdown.classList.add("hidden");
+  });
+
+  document.querySelectorAll(".role-option").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      const role = e.target.getAttribute("data-role");
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/auth/switch-role`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ role }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          navUserRole.textContent = formatRole(role);
+          document.querySelectorAll(".role-option").forEach(b => b.classList.remove("active"));
+          btn.classList.add("active");
+        }
+      } catch (err) {
+        console.error("Role switch error:", err);
+      }
+    });
+  });
+}
+
+function formatRole(role) {
+  return role.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+}
+
+// Global search keyboard shortcut
+function setupSearch() {
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "/" && document.activeElement !== globalSearch && document.activeElement.tagName !== "TEXTAREA" && document.activeElement.tagName !== "INPUT") {
+      e.preventDefault();
+      globalSearch.focus();
+    }
+  });
+
+  globalSearch.addEventListener("input", (e) => {
+    const q = e.target.value.toLowerCase().trim();
+    document.querySelectorAll(".exhibit-nav-item").forEach(item => {
+      const text = item.textContent.toLowerCase();
+      item.style.display = text.includes(q) ? "flex" : "none";
+    });
+  });
+}
+
+// Scenario Drawer Toggle
+toggleSimulatorBtn.addEventListener("click", () => {
+  scenarioDrawer.classList.toggle("hidden");
+});
+closeDrawerBtn.addEventListener("click", () => {
+  scenarioDrawer.classList.add("hidden");
+});
+newEvidenceBtn.addEventListener("click", () => {
+  scenarioDrawer.classList.remove("hidden");
+  document.getElementById("evidenceName").focus();
+});
+
+// Audit Trail Modal
+openAuditBtn.addEventListener("click", loadAuditTrail);
+closeAuditModalBtn.addEventListener("click", () => auditModal.classList.add("hidden"));
+auditModal.addEventListener("click", (e) => {
+  if (e.target === auditModal) auditModal.classList.add("hidden");
+});
+
+async function loadAuditTrail() {
+  auditModal.classList.remove("hidden");
+  auditTableBody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-dim);">Loading records...</td></tr>`;
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/audit?limit=50`);
+    if (!res.ok) throw new Error("Failed to load audit trail");
+    const records = await res.json();
+    if (records.length === 0) {
+      auditTableBody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-dim);">No audit events recorded yet.</td></tr>`;
+      return;
+    }
+    auditTableBody.innerHTML = records.map(r => `
+      <tr>
+        <td class="font-mono">${formatDate(r.timestamp)}</td>
+        <td><strong>${esc(r.user_name)}</strong></td>
+        <td><span class="font-mono">${esc(r.action)}</span></td>
+        <td>${esc(r.resource_type)} #${esc(r.resource_id)}</td>
+        <td>${esc(r.details || '—')}</td>
+      </tr>
+    `).join("");
+  } catch (err) {
+    auditTableBody.innerHTML = `<tr><td colspan="5" style="color:var(--altered-text);">${esc(err.message)}</td></tr>`;
+  }
+}
+
+// Quick Sample Demo Runner (Cycles Scenarios)
+runSampleBtn.addEventListener("click", () => {
+  const scenario = FORENSIC_SCENARIOS[scenarioIndex];
+  scenarioIndex = (scenarioIndex + 1) % FORENSIC_SCENARIOS.length;
+  const randId = Math.floor(Math.random() * 9000 + 1000);
   const time = new Date().toLocaleTimeString();
 
-  return {
-    name: `${scenario.prefix}-#${caseId}`,
-    content: scenario.generate(caseId, time),
-    tamperStep: scenario.tamperStep,
-    tamperLabel: scenario.tamperLabel,
-  };
-}
+  const name = `${scenario.prefix}-#${randId}`;
+  const content = scenario.generate(randId, time);
+  const simulateTamper = scenario.tamperStep !== 0;
 
-// ---- Element refs ----
-const runBtn          = document.getElementById("runDemoBtn");
-const sampleBtn       = document.getElementById("runSampleBtn");
-const btnText         = document.getElementById("btnText");
-const btnIcon         = document.getElementById("btnIcon");
-const banner          = document.getElementById("verdictBanner");
-const resultsSection  = document.getElementById("resultsSection");
-const timeline        = document.getElementById("timeline");
-const tamperToggle    = document.getElementById("tamperToggle");
-const toggleDesc      = document.getElementById("toggleDescription");
-const tamperStepSelect = document.getElementById("tamperStepSelect");
-const metaTamperValue = document.getElementById("metaTamperValue");
+  // Sync drawer fields
+  document.getElementById("evidenceName").value = name;
+  document.getElementById("evidenceContent").value = content;
+  document.getElementById("tamperStepSelect").value = String(scenario.tamperStep);
+  document.getElementById("tamperToggle").checked = simulateTamper;
 
-// ---- Tamper toggle hint ----
-function updateToggleDesc() {
-  const step = parseInt(tamperStepSelect ? tamperStepSelect.value : "3", 10);
-  if (!tamperToggle.checked || step === 0) {
-    toggleDesc.textContent = "Off — all handlers pass evidence honestly (expect Chain Intact)";
-    toggleDesc.style.color = "var(--success)";
-    if (metaTamperValue) {
-      metaTamperValue.textContent = "None — Clean Pipeline";
-      metaTamperValue.className = "meta-value accent";
-    }
-  } else {
-    const stepNames = { 2: "Step 2 — Analyst Tool", 3: "Step 3 — Export Tool", 4: "Step 4 — Reviewer", 5: "Step 5 — Archive" };
-    const label = stepNames[step] || `Step ${step}`;
-    toggleDesc.textContent = `On — ${label} will silently alter content and still report success`;
-    toggleDesc.style.color = "var(--danger)";
-    if (metaTamperValue) {
-      metaTamperValue.textContent = label;
-      metaTamperValue.className = "meta-value danger";
-    }
-  }
-}
-
-tamperToggle.addEventListener("change", updateToggleDesc);
-if (tamperStepSelect) {
-  tamperStepSelect.addEventListener("change", updateToggleDesc);
-}
-updateToggleDesc();
-
-// ---- Quick sample demo (cycles across different scenarios & tamper points) ----
-sampleBtn.addEventListener("click", () => {
-  const sample = getNextScenario();
-  document.getElementById("evidenceName").value = sample.name;
-  document.getElementById("evidenceContent").value = sample.content;
-
-  if (tamperStepSelect) {
-    tamperStepSelect.value = String(sample.tamperStep);
-  }
-  tamperToggle.checked = sample.tamperStep !== 0;
-  updateToggleDesc();
-
-  runVerification(sample.name, sample.content, tamperToggle.checked, sample.tamperStep);
+  ingestAndVerify({
+    name,
+    content,
+    simulate_tamper: simulateTamper,
+    tamper_step: scenario.tamperStep,
+  });
 });
 
-// ---- Manual form ----
-runBtn.addEventListener("click", () => {
-  const name           = document.getElementById("evidenceName").value.trim() || "Untitled-Evidence";
-  const content        = document.getElementById("evidenceContent").value.trim();
-  const simulateTamper = tamperToggle.checked;
-  const tamperStep     = parseInt(tamperStepSelect ? tamperStepSelect.value : "3", 10);
+// Manual Drawer Run
+runCustomBtn.addEventListener("click", () => {
+  const name = document.getElementById("evidenceName").value.trim() || `Exhibit-${Date.now()}`;
+  const content = document.getElementById("evidenceContent").value.trim();
+  const simulateTamper = document.getElementById("tamperToggle").checked;
+  const tamperStep = parseInt(document.getElementById("tamperStepSelect").value, 10);
 
   if (!content) {
-    const ta = document.getElementById("evidenceContent");
-    ta.style.borderColor = "var(--danger)";
-    ta.style.boxShadow   = "0 0 0 3px rgba(248,113,113,0.15)";
-    setTimeout(() => { ta.style.borderColor = ""; ta.style.boxShadow = ""; }, 1500);
-    ta.focus();
+    alert("Please enter digital artifact content to ingest.");
     return;
   }
-  runVerification(name, content, simulateTamper, tamperStep);
+
+  ingestAndVerify({
+    name,
+    content,
+    simulate_tamper: simulateTamper,
+    tamper_step: tamperStep,
+  });
+  scenarioDrawer.classList.add("hidden");
 });
 
-// ---- Shared verification runner ----
-async function runVerification(name, content, simulateTamper, tamperStep = 3) {
-  setLoading(true);
-  clearResults();
-
+// Re-Verify Active Evidence Button
+verifyBtn.addEventListener("click", async () => {
+  if (!currentEvidenceId) return;
+  verifyBtn.disabled = true;
+  verifyBtnText.textContent = "Verifying…";
   try {
-    // Step 1: Create evidence and run it through the full pipeline
-    const createRes = await fetch(`${API_BASE}/evidence`, {
+    const res = await fetch(`${API_BASE}/api/v1/verification/${currentEvidenceId}`, { method: "POST" });
+    if (res.ok) {
+      const data = await res.json();
+      renderVerificationResults(data);
+      loadExhibitList();
+    }
+  } catch (err) {
+    console.error("Verification error:", err);
+  } finally {
+    verifyBtn.disabled = false;
+    verifyBtnText.textContent = "Verify Integrity";
+  }
+});
+
+// Download Court Certificate PDF
+downloadPdfBtn.addEventListener("click", () => {
+  if (!currentEvidenceId) return;
+  window.open(`${API_BASE}/api/v1/reports/${currentEvidenceId}/pdf`, "_blank");
+});
+
+// Core Ingestion & Authoritative Verification Flow
+async function ingestAndVerify(payload) {
+  setGlobalLoading(true);
+  try {
+    // 1. Ingest Evidence
+    const createRes = await fetch(`${API_BASE}/api/v1/evidence`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        name,
-        content,
-        simulate_tamper: simulateTamper,
-        tamper_step: simulateTamper ? tamperStep : 0,
+        name: payload.name,
+        content: payload.content,
+        case_id: currentCaseId,
+        simulate_tamper: payload.simulate_tamper,
+        tamper_step: payload.tamper_step,
       }),
     });
 
@@ -162,255 +292,247 @@ async function runVerification(name, content, simulateTamper, tamperStep = 3) {
     }
 
     const created = await createRes.json();
-    const evidenceId = created.evidence_id;
+    currentEvidenceId = created.evidence_id;
 
-    // Step 2: Run the Verifier
-    const verifyRes = await fetch(`${API_BASE}/evidence/${evidenceId}/verify`);
-
-    if (!verifyRes.ok) {
-      const err = await verifyRes.json().catch(() => ({}));
-      throw new Error(err.detail || `Verifier error: ${verifyRes.status}`);
-    }
-
+    // 2. Query Authoritative Backend Verification Engine
+    const verifyRes = await fetch(`${API_BASE}/api/v1/verification/${currentEvidenceId}`, { method: "POST" });
+    if (!verifyRes.ok) throw new Error("Failed to verify evidence");
     const verifyData = await verifyRes.json();
 
-    // Render
-    renderResults(verifyData, { name });
-    loadHistory();
+    // 3. Render Results
+    renderVerificationResults(verifyData);
+    loadExhibitList();
 
   } catch (err) {
-    showError(err.message);
+    alert("Error executing custody pipeline: " + err.message);
   } finally {
-    setLoading(false);
+    setGlobalLoading(false);
   }
 }
 
-// ---- Loading state ----
-function setLoading(loading) {
-  runBtn.disabled    = loading;
-  sampleBtn.disabled = loading;
-  if (loading) {
-    btnText.textContent = "Running…";
-    btnIcon.innerHTML = '<span class="spinner"></span>';
-  } else {
-    btnText.textContent = "Run verification";
-    btnIcon.textContent = "▶";
-  }
-}
+// Render Authoritative Results to Canvas
+function renderVerificationResults(data) {
+  currentEvidenceId = data.evidence_id;
 
-// ---- Clear previous results ----
-function clearResults() {
-  banner.className = "verdict-banner hidden";
-  resultsSection.classList.add("hidden");
-  timeline.innerHTML = "";
-}
+  // Header
+  headerExhibitId.textContent = data.exhibit_id || `EX-${data.evidence_id}`;
+  headerExhibitTitle.textContent = data.evidence_name;
+  metaTimestamp.textContent = `Acquired: ${new Date().toLocaleTimeString()}`;
+  metaHash.textContent = `Original SHA-256: ${trunc(data.original_hash, 16)}`;
 
-// ---- Render results (verdict + timeline) ----
-function renderResults(data, meta) {
-  // Meta strip
-  document.getElementById("resultEvidenceId").textContent   = "#" + data.evidence_id;
-  document.getElementById("resultEvidenceName").textContent = meta.name;
-  document.getElementById("resultCheckedAt").textContent    = new Date().toLocaleTimeString();
-
-  // Verdict banner
+  // Authoritative Verdict Banner
   const isIntact = data.final_verdict === "CHAIN_INTACT";
-  const titleText = isIntact
-    ? "Chain Intact — Integrity Verified"
-    : formatVerdict(data.final_verdict);
+  verdictBanner.className = `verdict-banner-card ${isIntact ? "verified" : "altered"}`;
+  verdictBanner.classList.remove("hidden");
 
-  const subtitleText = isIntact
-    ? "All handlers verified independently end-to-end. Evidence in Archive matches original acquisition byte-for-byte."
-    : "Evidence in Archive no longer matches the original artifact collected. Unauthorized modification detected; subsequent forensic findings cannot be trusted.";
+  verdictStatusBadge.textContent = isIntact ? "VERIFIED" : "ALTERED";
 
-  banner.innerHTML = `
-    <div class="verdict-header">
-      <span class="verdict-icon-badge ${isIntact ? "ok" : "broken"}">${isIntact ? "✓" : "✕"}</span>
-      <div class="verdict-text-block">
-        <h3 class="verdict-headline">${escHtml(titleText)}</h3>
-        <p class="verdict-subtext">${escHtml(subtitleText)}</p>
-      </div>
-    </div>
-  `;
-  banner.className = "verdict-banner " + (isIntact ? "ok" : "broken");
+  if (isIntact) {
+    verdictTitle.textContent = "Chain Intact · All 5 Handlers Verified";
+    verdictExplanation.textContent =
+      "Authoritative independent recomputation confirmed: physical storage artifacts match baseline SHA-256, Ed25519 digital signatures are authentic, and event hash continuity is intact.";
+  } else {
+    verdictTitle.textContent = `Integrity Compromise Localized · ${formatVerdict(data.final_verdict)}`;
+    verdictExplanation.textContent =
+      "Unauthorized mutation detected. The stored artifact hash no longer matches the expected state. Downstream findings are forensically tainted.";
+  }
 
-  // Timeline
-  timeline.innerHTML = "";
-  let brokenSeen = false;
+  // Render Handler Progression Cards
+  timelineCards.innerHTML = "";
+  let breakEncountered = false;
 
-  data.steps.forEach((step, index) => {
-    let rowClass = "ok";
-    let iconChar = "✓";
-    let tag = "";
+  data.steps.forEach((step) => {
+    let statusClass = "verified";
+    let statusLabel = "Verified";
 
     if (!step.verified) {
-      rowClass = "broken";
-      iconChar = "✕";
-      brokenSeen = true;
-      tag = '<span class="step-tag broken">Tamper detected</span>';
-    } else if (brokenSeen) {
-      rowClass = "downstream";
-      iconChar = "⚠";
-      tag = '<span class="step-tag downstream">Downstream of break</span>';
+      statusClass = "altered";
+      statusLabel = "Altered";
+      breakEncountered = true;
+    } else if (step.downstream_of_break || breakEncountered) {
+      statusClass = "downstream";
+      statusLabel = "Downstream";
     }
 
-    const hashMismatch = !step.verified && step.handler_name !== "Collector";
-    const detail = buildDetail(step, hashMismatch, rowClass);
+    const card = document.createElement("div");
+    card.className = `handler-card ${statusClass === "altered" ? "altered" : ""}`;
 
-    const row = document.createElement("div");
-    row.className = "step-row " + rowClass;
-    row.style.animationDelay = `${index * 60}ms`;
-    row.innerHTML = `
-      <div class="step-main">
-        <span class="step-icon ${rowClass}">${iconChar}</span>
-        <div class="step-name">
-          <span class="step-title">${escHtml(step.step_order + ". " + step.handler_name)}</span>
-          ${tag}
+    const seqNum = String(step.step_order).padStart(2, "0");
+    const sigValid = step.signature_valid !== false;
+
+    card.innerHTML = `
+      <div class="handler-card-main">
+        <div class="handler-left">
+          <span class="step-number">${seqNum}</span>
+          <div class="handler-identity">
+            <span class="handler-name">${esc(step.handler_name)}</span>
+            <span class="handler-action">${esc(step.action || 'Standard forensic custody handling')}</span>
+          </div>
         </div>
-        <div class="step-meta-right">
-          <span class="step-status">Declared: <strong>${escHtml(step.declared_status)}</strong></span>
-          <span class="step-hash" title="Actual SHA-256">${truncHash(step.actual_hash)}</span>
-          <span class="step-expand">▾</span>
+        <div class="handler-right">
+          <span class="declared-pill">Declared: <strong>${esc(step.declared_status)}</strong></span>
+          <span class="verification-tag ${statusClass}">${statusLabel}</span>
+          <span class="expand-indicator">▾</span>
         </div>
       </div>
-      <div class="step-detail">${detail}</div>
+      <div class="handler-card-details">
+        <div class="proofs-grid">
+          <div class="proof-item">
+            <span class="proof-label">Input SHA-256</span>
+            <span class="proof-value">${esc(step.hash_before)}</span>
+          </div>
+          <div class="proof-item">
+            <span class="proof-label">Self-Declared Hash</span>
+            <span class="proof-value">${esc(step.hash_after)}</span>
+          </div>
+          <div class="proof-item">
+            <span class="proof-label">Storage Recomputed Hash</span>
+            <span class="proof-value ${step.verified ? 'match' : 'mismatch'}">${esc(step.actual_hash)}</span>
+          </div>
+        </div>
+        <div class="crypto-audit-row">
+          <div class="sig-status ${sigValid ? 'valid' : 'invalid'}">
+            <span>Ed25519 Signature:</span>
+            <strong>${sigValid ? 'Valid Authenticated' : 'Signature Invalid / Forged'}</strong>
+            <span class="font-mono" style="opacity:0.7">(${esc(step.signature_preview || 'Ed25519')})</span>
+          </div>
+          <div class="ledger-chain-status">
+            <span>Ledger Link:</span>
+            <strong style="color:var(--verified-text)">Continuous</strong>
+          </div>
+        </div>
+      </div>
     `;
 
-    // Expand on click
-    row.querySelector(".step-main").addEventListener("click", () => {
-      row.classList.toggle("expanded");
+    // Toggle progressive disclosure
+    card.querySelector(".handler-card-main").addEventListener("click", () => {
+      card.classList.toggle("expanded");
     });
 
-    timeline.appendChild(row);
+    timelineCards.appendChild(card);
   });
-
-  resultsSection.classList.remove("hidden");
-
-  // Smoothly reveal results ensuring the banner is at the top of view
-  banner.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
-// ---- Build expandable hash detail ----
-function buildDetail(step, hashMismatch, rowClass) {
-  const actualClass = hashMismatch ? "hash-value mismatch" : "hash-value match";
-
-  let verdictMsg = "";
-  if (step.handler_name === "Collector") {
-    verdictMsg = `<div class="detail-verdict ok">✓ Trusted origin — baseline acquisition hash for the entire custody chain.</div>`;
-  } else if (rowClass === "broken") {
-    verdictMsg = `<div class="detail-verdict fail">✕ Breach Point — unauthorized content alteration detected. Output hash does not match previous handler output.</div>`;
-  } else if (rowClass === "downstream") {
-    verdictMsg = `<div class="detail-verdict warn">⚠ Downstream of break — this handler did not tamper with evidence, but inherited already-compromised artifact data.</div>`;
-  } else if (step.verified) {
-    verdictMsg = `<div class="detail-verdict ok">✓ Verified — recomputed hash matches previous stage output exactly. No tampering detected.</div>`;
-  }
-
-  return `
-    <div class="hash-fields-grid">
-      <div class="hash-field">
-        <span class="hash-label">Input Hash (Previous Output)</span>
-        <span class="hash-value">${escHtml(step.hash_before)}</span>
-      </div>
-      <div class="hash-field">
-        <span class="hash-label">Self-Reported Declared Hash</span>
-        <span class="hash-value">${escHtml(step.hash_after)}</span>
-      </div>
-      <div class="hash-field">
-        <span class="hash-label">Independent Verifier Recomputed Hash</span>
-        <span class="${actualClass}">${escHtml(step.actual_hash)}</span>
-      </div>
-    </div>
-    ${verdictMsg}
-  `;
-}
-
-// ---- Error display ----
-function showError(message) {
-  banner.className = "verdict-banner broken";
-  banner.textContent = "✕  Error: " + message;
-}
-
-// ---- Helpers ----
-function formatVerdict(raw) {
-  // "CHAIN_BROKEN_AT_STEP_3_EXPORT_TOOL" → "Chain broken at step 3 — Export Tool"
-  return raw
-    .replace("CHAIN_BROKEN_AT_STEP_", "Chain broken at step ")
-    .replace(/_/g, " ")
-    .replace(/(\d+) (.+)/, (_, n, rest) => `${n} — ${rest}`);
-}
-
-function truncHash(hash) {
-  if (!hash || hash.length < 12) return hash || "—";
-  return `${hash.slice(0, 10)}…${hash.slice(-4)}`;
-}
-
-function escHtml(str) {
-  if (typeof str !== "string") return String(str ?? "");
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-// ---- History loader ----
-async function loadHistory() {
+// Load Exhibits for Sidebar
+async function loadExhibitList() {
   try {
-    const res = await fetch(`${API_BASE}/history`);
+    const res = await fetch(`${API_BASE}/api/v1/evidence`);
     if (!res.ok) return;
-    const items = await res.json();
+    const exhibits = await res.json();
 
-    const countEl = document.getElementById("historyCount");
-    if (countEl) countEl.textContent = `${items.length} total`;
+    sidebarExhibitCount.textContent = `${exhibits.length} exhibits`;
+    exhibitNavList.innerHTML = "";
 
-    const list = document.getElementById("historyList");
-    if (!list) return;
-    list.innerHTML = "";
-
-    if (items.length === 0) {
-      list.innerHTML = '<div class="history-empty">No runs yet — click Run sample demo or Run verification to begin.</div>';
+    if (exhibits.length === 0) {
+      exhibitNavList.innerHTML = `<div class="empty-notice" style="padding:16px 8px;font-size:11px;color:var(--text-dim);text-align:center;">No exhibits yet. Run Quick Demo.</div>`;
       return;
     }
 
-    items.forEach((item) => {
-      const isIntact = item.final_verdict === "CHAIN_INTACT";
-      const verdictLabel = isIntact
-        ? "Verified Intact"
-        : item.final_verdict.replace("CHAIN_BROKEN_AT_", "").replace(/_/g, " ");
-
-      const row = document.createElement("div");
-      row.className = "history-row";
-      row.innerHTML = `
-        <div class="history-row-main">
-          <div class="history-row-header">
-            <span class="history-id">#${item.evidence_id}</span>
-            <span class="history-name" title="${escHtml(item.name)}">${escHtml(item.name)}</span>
-            <span class="history-badge ${isIntact ? "ok" : "broken"}">
-              ${isIntact ? "INTACT" : "BROKEN"}
-            </span>
-          </div>
-          <div class="history-row-sub">
-            <span class="history-time">${new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
-            <span class="history-verdict-summary ${isIntact ? "ok" : "broken"}">${escHtml(verdictLabel)}</span>
-          </div>
+    exhibits.forEach((item) => {
+      const isVerified = item.status === "VERIFIED" || item.latest_verdict === "CHAIN_INTACT";
+      const navItem = document.createElement("div");
+      navItem.className = `exhibit-nav-item ${currentEvidenceId === item.id ? "active" : ""}`;
+      navItem.innerHTML = `
+        <div class="nav-item-top">
+          <span class="nav-item-name" title="${esc(item.name)}">${esc(item.name)}</span>
+          <span class="nav-item-badge ${isVerified ? 'verified' : 'altered'}">
+            ${isVerified ? 'Verified' : 'Altered'}
+          </span>
+        </div>
+        <div class="nav-item-sub">
+          <span>${esc(item.exhibit_id || '#' + item.id)}</span>
+          <span>${formatDate(item.created_at)}</span>
         </div>
       `;
-      row.addEventListener("click", async () => {
+
+      navItem.addEventListener("click", async () => {
+        document.querySelectorAll(".exhibit-nav-item").forEach(i => i.classList.remove("active"));
+        navItem.classList.add("active");
         try {
-          const verifyRes = await fetch(`${API_BASE}/evidence/${item.evidence_id}/verify`);
+          const verifyRes = await fetch(`${API_BASE}/api/v1/verification/${item.id}`, { method: "POST" });
           if (verifyRes.ok) {
-            const verifyData = await verifyRes.json();
-            renderResults(verifyData, { name: item.name });
+            const data = await verifyRes.json();
+            renderVerificationResults(data);
           }
         } catch (e) {
-          console.error("Error loading historical verification:", e);
+          console.error("Error loading exhibit:", e);
         }
       });
-      list.appendChild(row);
+
+      exhibitNavList.appendChild(navItem);
     });
+
+    // If no evidence is currently selected, auto-select the latest one
+    if (!currentEvidenceId && exhibits.length > 0) {
+      const latest = exhibits[0];
+      const verifyRes = await fetch(`${API_BASE}/api/v1/verification/${latest.id}`, { method: "POST" });
+      if (verifyRes.ok) {
+        const data = await verifyRes.json();
+        renderVerificationResults(data);
+      }
+    }
+
   } catch (err) {
-    console.warn("Failed to load history:", err);
+    console.warn("Failed to load exhibits:", err);
   }
 }
 
-// Initial load
-loadHistory();
+// Load Cases for Case Selector
+async function loadCases() {
+  try {
+    const res = await fetch(`${API_BASE}/api/v1/cases`);
+    if (!res.ok) return;
+    const cases = await res.json();
+    const caseSelect = document.getElementById("caseSelect");
+    if (!caseSelect || cases.length === 0) return;
+
+    caseSelect.innerHTML = cases.map(c => `
+      <option value="${c.id}">Case: ${esc(c.title)} (${esc(c.case_number)})</option>
+    `).join("");
+
+    headerCaseNumber.textContent = cases[0].case_number;
+    currentCaseId = cases[0].id;
+  } catch (err) {
+    console.warn("Failed to load cases:", err);
+  }
+}
+
+// Utility Helpers
+function setGlobalLoading(isLoading) {
+  runSampleBtn.disabled = isLoading;
+  runCustomBtn.disabled = isLoading;
+  if (isLoading) {
+    runSampleBtn.innerHTML = `<span class="btn-symbol">⏳</span><span>Processing…</span>`;
+  } else {
+    runSampleBtn.innerHTML = `<span class="btn-symbol">▶</span><span>Quick Demo Scenario</span>`;
+  }
+}
+
+function formatVerdict(v) {
+  return v
+    .replace("CHAIN_BROKEN_AT_STEP_", "Step ")
+    .replace("SIGNATURE_INVALID_AT_STEP_", "Invalid Signature at Step ")
+    .replace("LEDGER_BROKEN_AT_STEP_", "Ledger Broken at Step ")
+    .replace(/_/g, " ");
+}
+
+function formatDate(isoStr) {
+  if (!isoStr) return "—";
+  try {
+    const d = new Date(isoStr);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return String(isoStr);
+  }
+}
+
+function trunc(str, len = 12) {
+  if (!str) return "—";
+  if (str.length <= len) return str;
+  return `${str.slice(0, len)}…`;
+}
+
+function esc(str) {
+  if (typeof str !== "string") return String(str ?? "");
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}

@@ -288,7 +288,6 @@ async function loadHistory() {
           if (verifyRes.ok) {
             const verifyData = await verifyRes.json();
             renderResults(verifyData, { name: item.name });
-            closeHistory();
             resultsSection.scrollIntoView({ behavior: "smooth" });
           }
         } catch (e) {
@@ -302,53 +301,5 @@ async function loadHistory() {
   }
 }
 
-// Initial load in background to populate count if needed
+// Initial load
 loadHistory();
-
-// ---- History modal ----
-const toggleHistoryBtn = document.getElementById("toggleHistoryBtn");
-const closeHistoryBtn  = document.getElementById("closeHistoryBtn");
-const historyModal     = document.getElementById("historyModal");
-
-function openHistory() {
-  if (!historyModal) return;
-  historyModal.classList.remove("hidden");
-  if (toggleHistoryBtn) toggleHistoryBtn.classList.add("active");
-  loadHistory();
-}
-
-function closeHistory() {
-  if (!historyModal) return;
-  historyModal.classList.add("hidden");
-  if (toggleHistoryBtn) toggleHistoryBtn.classList.remove("active");
-}
-
-if (toggleHistoryBtn) {
-  toggleHistoryBtn.addEventListener("click", () => {
-    if (historyModal && historyModal.classList.contains("hidden")) {
-      openHistory();
-    } else {
-      closeHistory();
-    }
-  });
-}
-
-if (closeHistoryBtn) {
-  closeHistoryBtn.addEventListener("click", closeHistory);
-}
-
-// Close when clicking outside modal card
-if (historyModal) {
-  historyModal.addEventListener("click", (e) => {
-    if (e.target === historyModal) {
-      closeHistory();
-    }
-  });
-}
-
-// Close on Escape key
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && historyModal && !historyModal.classList.contains("hidden")) {
-    closeHistory();
-  }
-});

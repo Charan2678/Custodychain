@@ -24,119 +24,110 @@
       <div class="badges">
         <span class="badge badge-accent">SHA-256</span>
         <span class="badge badge-outline">Forensic Simulation</span>
-        <button id="toggleHistoryBtn" class="badge-btn" type="button">
-          <span>📜 History</span>
-        </button>
       </div>
     </header>
 
-    <section class="meta-strip">
-      <div class="meta-item">
-        <span class="meta-label">Pipeline</span>
-        <span class="meta-value">5 handlers</span>
-      </div>
-      <div class="meta-divider"></div>
-      <div class="meta-item">
-        <span class="meta-label">Hash algorithm</span>
-        <span class="meta-value accent">SHA-256</span>
-      </div>
-      <div class="meta-divider"></div>
-      <div class="meta-item">
-        <span class="meta-label">Tamper injected at</span>
-        <span class="meta-value danger">Step 3 — Export Tool</span>
-      </div>
-      <div class="meta-divider"></div>
-      <div class="meta-item">
-        <span class="meta-label">Verification mode</span>
-        <span class="meta-value">Independent recompute</span>
-      </div>
-    </section>
+    <div class="dashboard-grid">
 
-    <section class="panel">
-      <div class="quick-demo-row">
-        <div>
-          <strong>Quick demo</strong>
-          <span class="quick-demo-desc">Run instantly with a pre-loaded sample case</span>
-        </div>
-        <button id="runSampleBtn" class="btn-secondary">
-          <span class="btn-icon">▶</span> Run sample demo
-        </button>
+      <!-- LEFT: main working area -->
+      <div class="main-col">
+        <section class="panel">
+          <div class="quick-demo-row">
+            <div>
+              <strong>Quick demo</strong>
+              <span class="quick-demo-desc">Run instantly with a pre-loaded sample case</span>
+            </div>
+            <button id="runSampleBtn" class="btn-secondary">
+              <span class="btn-icon">▶</span> Run sample demo
+            </button>
+          </div>
+
+          <div class="divider-or"><span>or enter your own evidence</span></div>
+
+          <div class="field">
+            <label for="evidenceName">Case / Exhibit ID</label>
+            <input type="text" id="evidenceName" placeholder="Case-2026-0912-Exhibit-A" />
+          </div>
+
+          <div class="field">
+            <label for="evidenceContent">Digital artifact content (simulated evidence)</label>
+            <textarea id="evidenceContent" rows="5" placeholder="Paste or type the evidence text here…&#10;&#10;Example:&#10;CASE_FILE_2026_0912&#10;Suspect device seized at 14:02.&#10;Hash chain begins here."></textarea>
+          </div>
+
+          <label class="toggle-row" for="tamperToggle">
+            <span class="toggle-switch">
+              <input type="checkbox" id="tamperToggle" checked />
+              <span class="toggle-slider"></span>
+            </span>
+            <span class="toggle-text">
+              <strong>Simulate tamper at Export Tool</strong>
+              <span id="toggleDescription" class="toggle-desc">On — Export Tool will silently alter content and still report success</span>
+            </span>
+          </label>
+
+          <button id="runDemoBtn" class="btn-primary">
+            <span class="btn-icon" id="btnIcon">▶</span>
+            <span id="btnText">Run verification</span>
+          </button>
+        </section>
+
+        <div id="verdictBanner" class="verdict-banner hidden"></div>
+
+        <section id="resultsSection" class="results-section hidden">
+          <div class="results-meta">
+            <span><strong>Evidence ID</strong> <span id="resultEvidenceId">—</span></span>
+            <span><strong>Name</strong> <span id="resultEvidenceName">—</span></span>
+            <span><strong>Checked</strong> <span id="resultCheckedAt">—</span></span>
+          </div>
+
+          <div class="timeline-header">
+            <span>Chain of custody</span>
+            <span class="hint">Click a step to inspect hashes</span>
+          </div>
+
+          <div id="timeline" class="timeline"></div>
+
+          <div class="legend">
+            <span class="legend-item"><span class="dot dot-ok"></span> Verified — hash matches expected</span>
+            <span class="legend-item"><span class="dot dot-broken"></span> Broken — unauthorized change detected</span>
+            <span class="legend-item"><span class="dot dot-downstream"></span> Downstream of break</span>
+          </div>
+        </section>
       </div>
 
-      <div class="divider-or"><span>or enter your own evidence</span></div>
-
-      <div class="field-row">
-        <div class="field">
-          <label for="evidenceName">Case / Exhibit ID</label>
-          <input type="text" id="evidenceName" placeholder="Case-2026-0912-Exhibit-A" />
-        </div>
-        <div class="field">
-          <label>Pipeline stages</label>
+      <!-- RIGHT: sidebar -->
+      <aside class="side-col">
+        <section class="panel side-panel">
+          <div class="meta-stack">
+            <div class="meta-block">
+              <span class="meta-label">Pipeline</span>
+              <span class="meta-value">5 handlers</span>
+            </div>
+            <div class="meta-block">
+              <span class="meta-label">Hash algorithm</span>
+              <span class="meta-value accent">SHA-256</span>
+            </div>
+            <div class="meta-block">
+              <span class="meta-label">Tamper injected at</span>
+              <span class="meta-value danger">Step 3 — Export Tool</span>
+            </div>
+            <div class="meta-block">
+              <span class="meta-label">Verification mode</span>
+              <span class="meta-value">Independent recompute</span>
+            </div>
+          </div>
           <div class="pipeline-preview">Collector → Analyst → Export → Reviewer → Archive</div>
-        </div>
-      </div>
+        </section>
 
-      <div class="field">
-        <label for="evidenceContent">Digital artifact content (simulated evidence)</label>
-        <textarea id="evidenceContent" rows="5" placeholder="Paste or type the evidence text here…&#10;&#10;Example:&#10;CASE_FILE_2026_0912&#10;Suspect device seized at 14:02.&#10;Hash chain begins here."></textarea>
-      </div>
-
-      <label class="toggle-row" for="tamperToggle">
-        <span class="toggle-switch">
-          <input type="checkbox" id="tamperToggle" checked />
-          <span class="toggle-slider"></span>
-        </span>
-        <span class="toggle-text">
-          <strong>Simulate tamper at Export Tool</strong>
-          <span id="toggleDescription" class="toggle-desc">On — Export Tool will silently alter content and still report success</span>
-        </span>
-      </label>
-
-      <button id="runDemoBtn" class="btn-primary">
-        <span class="btn-icon" id="btnIcon">▶</span>
-        <span id="btnText">Run verification</span>
-      </button>
-    </section>
-
-    <div id="verdictBanner" class="verdict-banner hidden"></div>
-
-    <section id="resultsSection" class="results-section hidden">
-      <div class="results-meta">
-        <span><strong>Evidence ID</strong> <span id="resultEvidenceId">—</span></span>
-        <span><strong>Name</strong> <span id="resultEvidenceName">—</span></span>
-        <span><strong>Checked</strong> <span id="resultCheckedAt">—</span></span>
-      </div>
-
-      <div class="timeline-header">
-        <span>Chain of custody</span>
-        <span class="hint">Click a step to inspect hashes</span>
-      </div>
-
-      <div id="timeline" class="timeline"></div>
-
-      <div class="legend">
-        <span class="legend-item"><span class="dot dot-ok"></span> Verified — hash matches expected</span>
-        <span class="legend-item"><span class="dot dot-broken"></span> Broken — unauthorized change detected</span>
-        <span class="legend-item"><span class="dot dot-downstream"></span> Downstream of break</span>
-      </div>
-    </section>
-
-    <!-- History Modal Dialog -->
-    <div id="historyModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-      <div class="modal-card">
-        <div class="modal-header">
-          <span id="modalTitle" class="modal-title">Verification History</span>
-          <div class="modal-actions">
+        <section class="panel side-panel history-panel">
+          <div class="timeline-header">
+            <span>History</span>
             <span class="hint" id="historyCount"></span>
-            <button id="closeHistoryBtn" class="btn-close" title="Close history" type="button">✕</button>
           </div>
-        </div>
-        <div class="modal-body">
-          <div id="historyList" class="history-list">
-            <div class="history-empty">No runs yet — click Run sample demo or Run verification to begin.</div>
-          </div>
-        </div>
-      </div>
+          <div id="historyList" class="history-list"></div>
+        </section>
+      </aside>
+
     </div>
 
     <footer class="app-footer">CustodyChain v1.0 &nbsp;·&nbsp; Myonsite Hackathon &nbsp;·&nbsp; Built by Charan</footer>

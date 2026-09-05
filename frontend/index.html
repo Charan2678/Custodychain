@@ -18,11 +18,15 @@
         <div>
           <h1>CustodyChain</h1>
           <p class="brand-subtitle">Multi-Handler Evidence Integrity Verification</p>
+          <p class="scenario-line">Simulates a 5-stage evidence handling pipeline — one step silently alters the evidence while reporting success. The verifier catches it independently, without trusting that report.</p>
         </div>
       </div>
       <div class="badges">
         <span class="badge badge-accent">SHA-256</span>
         <span class="badge badge-outline">Forensic Simulation</span>
+        <button id="toggleHistoryBtn" class="badge-btn" type="button">
+          <span>📜 History</span>
+        </button>
       </div>
     </header>
 
@@ -63,7 +67,7 @@
 
       <div class="field-row">
         <div class="field">
-          <label for="evidenceName">Evidence name</label>
+          <label for="evidenceName">Case / Exhibit ID</label>
           <input type="text" id="evidenceName" placeholder="Case-2026-0912-Exhibit-A" />
         </div>
         <div class="field">
@@ -73,7 +77,7 @@
       </div>
 
       <div class="field">
-        <label for="evidenceContent">Evidence content</label>
+        <label for="evidenceContent">Digital artifact content (simulated evidence)</label>
         <textarea id="evidenceContent" rows="5" placeholder="Paste or type the evidence text here…&#10;&#10;Example:&#10;CASE_FILE_2026_0912&#10;Suspect device seized at 14:02.&#10;Hash chain begins here."></textarea>
       </div>
 
@@ -117,10 +121,13 @@
       </div>
     </section>
 
-    <section class="panel history-panel">
+    <section id="historySection" class="panel history-panel hidden">
       <div class="timeline-header">
-        <span>History</span>
-        <span class="hint" id="historyCount"></span>
+        <span>Verification History</span>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span class="hint" id="historyCount"></span>
+          <button id="closeHistoryBtn" class="btn-close" title="Close history" type="button">✕</button>
+        </div>
       </div>
       <div id="historyList" class="history-list">
         <div class="history-empty">No runs yet — click Run sample demo or Run verification to begin.</div>

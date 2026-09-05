@@ -135,9 +135,9 @@ function renderResults(data, meta) {
 
   // Verdict banner
   const isIntact = data.final_verdict === "CHAIN_INTACT";
-  banner.textContent = isIntact
-    ? "✓  Chain intact — evidence verified end to end"
-    : "✕  " + formatVerdict(data.final_verdict);
+  banner.innerHTML = isIntact
+    ? "Chain intact — evidence verified end to end. This artifact reflects the original exactly."
+    : `${data.final_verdict.replaceAll("_", " ")} — evidence in Archive no longer matches the original artifact collected. Later analysis based on this exhibit cannot be trusted.`;
   banner.className = "verdict-banner " + (isIntact ? "ok" : "broken");
 
   // Timeline
@@ -303,3 +303,33 @@ async function loadHistory() {
 
 // Initial load
 loadHistory();
+
+// ---- History toggle ----
+const toggleHistoryBtn = document.getElementById("toggleHistoryBtn");
+const closeHistoryBtn  = document.getElementById("closeHistoryBtn");
+const historySection   = document.getElementById("historySection");
+
+function toggleHistory() {
+  if (!historySection) return;
+  const isHidden = historySection.classList.contains("hidden");
+  if (isHidden) {
+    historySection.classList.remove("hidden");
+    if (toggleHistoryBtn) toggleHistoryBtn.classList.add("active");
+    loadHistory();
+    historySection.scrollIntoView({ behavior: "smooth" });
+  } else {
+    historySection.classList.add("hidden");
+    if (toggleHistoryBtn) toggleHistoryBtn.classList.remove("active");
+  }
+}
+
+if (toggleHistoryBtn) {
+  toggleHistoryBtn.addEventListener("click", toggleHistory);
+}
+
+if (closeHistoryBtn) {
+  closeHistoryBtn.addEventListener("click", () => {
+    if (historySection) historySection.classList.add("hidden");
+    if (toggleHistoryBtn) toggleHistoryBtn.classList.remove("active");
+  });
+}

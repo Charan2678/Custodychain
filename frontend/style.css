@@ -31,10 +31,10 @@ body {
   font-family: var(--font-sans);
   color: var(--text-primary);
   min-height: 100vh;
-  padding: 48px 24px;
+  padding: 40px 32px;
 }
 
-.page { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+.page { max-width: 920px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
 
 /* ---- Header ---- */
 .app-header {
@@ -92,6 +92,7 @@ body {
   resize: vertical; transition: border-color 0.15s, box-shadow 0.15s;
   width: 100%;
 }
+.field textarea { min-height: 140px; }
 .field input:focus, .field textarea:focus {
   outline: none; border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.1);
@@ -117,6 +118,19 @@ body {
 .toggle-switch input:checked + .toggle-slider::before { transform: translateX(18px); background: #fff; }
 .toggle-text { display: flex; flex-direction: column; gap: 3px; font-size: 14px; }
 .toggle-desc { font-size: 12px; color: var(--text-secondary); }
+
+/* ---- Two-column field row ---- */
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.pipeline-preview {
+  background: var(--bg); border: 1px solid var(--border-strong); border-radius: 8px;
+  padding: 12px 14px; font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary);
+  display: flex; align-items: center; height: 100%;
+  letter-spacing: 0.01em; line-height: 1.6;
+}
 
 /* ---- Quick demo row ---- */
 .quick-demo-row {
@@ -292,4 +306,5 @@ body {
   .meta-divider { display: none; }
   .results-meta { flex-direction: column; gap: 8px; }
   .step-hash { display: none; }
+  .field-row { grid-template-columns: 1fr; }
 }

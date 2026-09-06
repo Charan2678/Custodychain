@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="CustodyChain — Digital Evidence Integrity Verification Platform" />
+  <title>CustodyChain — Forensic Evidence Authority</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- =========================================================================
+       1. DEDICATED MINIMAL LOGIN VIEW (420px CENTERED)
+       ========================================================================= -->
+  <div id="loginView" class="login-viewport">
+    <div class="login-frame">
+      <div class="login-box">
+        <div class="login-brand-header">
+          <div class="login-logo"><span class="brand-glyph">◇</span></div>
+          <h1 class="login-brand-name">CustodyChain</h1>
+          <p class="login-platform-label">Digital Evidence Platform</p>
+          <div class="login-heading-rule" aria-hidden="true"></div>
+          <h2 class="login-title">Welcome back</h2>
+          <p class="login-sub">Sign in to your forensic workspace.</p>
+        </div>
+
+        <div class="login-card-form">
+          <form id="loginForm" novalidate>
+            <div class="form-field">
+              <label for="loginEmail">Email</label>
+              <input type="email" id="loginEmail" class="text-input" placeholder="name@example.com" required autocomplete="username" />
+            </div>
+
+            <div class="form-field">
+              <label for="loginPassword">Password</label>
+              <div class="password-field">
+                <input type="password" id="loginPassword" class="text-input" placeholder="Enter your password" required autocomplete="current-password" />
+                <button class="password-toggle" id="passwordToggleBtn" type="button" aria-label="Show password">Show</button>
+              </div>
+            </div>
+
+            <p class="login-error" id="loginError" role="alert" aria-live="polite"></p>
+            <button type="submit" class="btn btn-primary login-submit" id="loginSubmitBtn">Sign in</button>
+          </form>
+
+          <button class="demo-access-btn" id="demoAccessBtn" type="button">Use demo account</button>
+        </div>
+
+        <div class="login-security-note">
+          <span>Secure access to your CustodyChain workspace.</span>
+          <span>Role-based access control · Cryptographic verification</span>
+        </div>
+
+        <div class="login-footer-links">
+          <span class="login-footer-links-row"><a href="#security">Security</a><a href="#privacy">Privacy</a><a href="#status">System status</a></span>
+          <span class="login-footer-brand">CustodyChain · Evidence Integrity Platform</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="demo-modal-backdrop hidden" id="demoAccessModal" role="dialog" aria-modal="true" aria-labelledby="demoAccessTitle">
+    <div class="demo-modal">
+      <div class="demo-modal-header">
+        <div><span class="context-kicker">Controlled environment</span><h2 id="demoAccessTitle">Demo environment</h2></div>
+        <button class="btn-close-modal" id="closeDemoAccessBtn" type="button" aria-label="Close demo environment">✕</button>
+      </div>
+      <p class="demo-modal-copy">Choose a role to preview the workflow. Authentication still runs through the normal login flow.</p>
+      <div class="demo-role-list">
+        <button class="quick-role-btn" data-email="officer@custodychain.internal" data-pass="evidence123" data-role="EVIDENCE_OFFICER" type="button">Evidence Officer <span>Intake & custody</span></button>
+        <button class="quick-role-btn" data-email="analyst@custodychain.internal" data-pass="evidence123" data-role="FORENSIC_ANALYST" type="button">Forensic Analyst <span>Processing & verification</span></button>
+        <button class="quick-role-btn" data-email="auditor@custodychain.internal" data-pass="evidence123" data-role="AUDITOR" type="button">Auditor <span>Independent review</span></button>
+        <button class="quick-role-btn" data-email="charan@custodychain.internal" data-pass="evidence123" data-role="SYSTEM_ADMIN" type="button">System Administrator <span>System oversight</span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       2. GLOBAL APP SHELL (240px SIDEBAR + MAIN WORKSPACE)
+       ========================================================================= -->
+  <div id="appView" class="app-shell hidden">
+
+    <!-- LEFT SIDEBAR -->
+    <aside class="sidebar" id="appSidebar">
+      <div class="sidebar-header">
+        <span class="brand-glyph">◇</span>
+        <div>
+          <span class="brand-title">CustodyChain</span>
+          <span class="brand-sub">Forensic Authority</span>
+        </div>
+      </div>
+
+      <!-- Role-Adapted Navigation -->
+      <nav class="sidebar-nav" id="sidebarNav">
+        <!-- Injected dynamically by app.js based on active role -->
+      </nav>
+
+      <!-- Sidebar Bottom Profile & Controls -->
+      <div class="sidebar-footer">
+        <div class="user-profile-summary">
+          <div class="avatar-chip" id="sidebarUserAvatar">O</div>
+          <div class="user-text-wrap">
+            <span class="user-display-name" id="sidebarUserName">Officer Bob</span>
+            <span class="user-role-label" id="sidebarUserRole">Evidence Officer</span>
+          </div>
+        </div>
+
+        <div class="sidebar-footer-actions">
+          <button id="themeToggleBtn" class="btn-sidebar-icon" title="Toggle theme (Light / Dark)" type="button">
+            <span id="themeIcon">☀️</span>
+          </button>
+          <button id="logoutBtn" class="btn-sidebar-icon" title="Sign out" type="button">
+            <span>⎋</span>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN WRAPPER -->
+    <div class="main-wrapper">
+      <!-- MINIMAL TOP BAR -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <button id="mobileMenuToggle" class="mobile-menu-btn" type="button">☰</button>
+          <span class="breadcrumb-label" id="currentViewBreadcrumb">Overview</span>
+        </div>
+
+        <div class="topbar-right">
+          <div class="case-select-wrapper">
+            <span>Case:</span>
+            <select id="globalCaseSelect" class="minimal-select" title="Active Investigation Case">
+              <option value="">Loading cases...</option>
+            </select>
+          </div>
+        </div>
+      </header>
+
+      <!-- FLUID WORKSPACE CONTENT (MOUNT POINT FOR VIEWS) -->
+      <main class="workspace-scroll">
+        <div class="workspace-inner" id="workspaceContent">
+          <!-- Dynamically populated by app.js router -->
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       MODALS
+       ========================================================================= -->
+
+  <!-- REGISTER CASE MODAL -->
+  <div class="modal-backdrop hidden" id="newCaseModal">
+    <div class="modal-panel">
+      <div class="modal-top">
+        <h3 class="modal-heading">Register New Case</h3>
+        <button class="btn-close-modal" id="closeCaseModalBtn" type="button">✕</button>
+      </div>
+      <form id="newCaseForm">
+        <div class="modal-content">
+          <div class="form-field">
+            <label for="caseNumInput">Case Number / Reference ID</label>
+            <input type="text" id="caseNumInput" class="text-input" placeholder="CASE-2026-0916" required />
+          </div>
+          <div class="form-field">
+            <label for="caseTitleInput">Case Title</label>
+            <input type="text" id="caseTitleInput" class="text-input" placeholder="Digital Device Seizure Investigation" required />
+          </div>
+          <div class="form-field">
+            <label for="caseDescInput">Description / Scope</label>
+            <textarea id="caseDescInput" class="text-area" rows="3" placeholder="Case background notes..."></textarea>
+          </div>
+        </div>
+        <div class="modal-bottom">
+          <button type="button" class="btn btn-secondary" id="cancelCaseModalBtn">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create Case</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- INGEST EVIDENCE MODAL -->
+  <div class="modal-backdrop hidden" id="newEvidenceModal">
+    <div class="modal-panel">
+      <div class="modal-top">
+        <h3 class="modal-heading">Ingest Evidence</h3>
+        <button class="btn-close-modal" id="closeEvidenceModalBtn" type="button">✕</button>
+      </div>
+      <form id="newEvidenceForm">
+        <div class="modal-content">
+          <div class="form-field">
+            <label for="evNameInput">Evidence Name / Exhibit Title</label>
+            <input type="text" id="evNameInput" class="text-input" placeholder="Exhibit-01-NVMe-Disk" required />
+          </div>
+          <div class="form-field">
+            <label for="evContentInput">Digital Bitstream (Raw Data Content)</label>
+            <textarea id="evContentInput" class="text-area" rows="5" placeholder="Raw forensic payload or sector stream..." required></textarea>
+          </div>
+          <div class="form-field">
+            <label for="evDescInput">Intake Custody Remarks</label>
+            <input type="text" id="evDescInput" class="text-input" placeholder="Acquired under legal chain of custody warrant." />
+          </div>
+        </div>
+        <div class="modal-bottom">
+          <button type="button" class="btn btn-secondary" id="cancelEvidenceModalBtn">Cancel</button>
+          <button type="submit" class="btn btn-primary">Seal & Ingest</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- UPLOAD EVIDENCE FILE MODAL (images / videos / text / documents) -->
+  <div class="modal-backdrop hidden" id="uploadEvidenceModal">
+    <div class="modal-panel modal-panel-wide">
+      <div class="modal-top">
+        <h3 class="modal-heading">Upload Evidence File</h3>
+        <button class="btn-close-modal" id="closeUploadModalBtn" type="button">✕</button>
+      </div>
+      <form id="uploadEvidenceForm">
+        <div class="modal-content">
+          <div class="form-field">
+            <label for="uploadNameInput">Evidence Name / Exhibit Title</label>
+            <input type="text" id="uploadNameInput" class="text-input" placeholder="Exhibit-02-Surveillance-Still" required />
+          </div>
+          <div class="form-field">
+            <label>Evidence File <span class="mono-hint">(images, videos, PDFs, documents, text — hashed at rest via SHA-256)</span></label>
+            <div class="upload-dropzone" id="uploadDropzone">
+              <div class="dz-icon">⬆</div>
+              <div class="dz-title">Click to choose or drag a file here</div>
+              <div class="dz-sub">JPEG / PNG / MP4 / WEBM / PDF / TXT / binaries</div>
+              <input type="file" id="uploadFileInput" style="display:none;" accept="image/*,video/*,application/pdf,audio/*,.txt,.csv,.json,.log,.bin,.doc,.docx" />
+            </div>
+            <div id="uploadFilePreview" class="upload-file-preview hidden">No file selected.</div>
+            <div id="uploadMediaPreview" class="media-preview-frame hidden"></div>
+          </div>
+          <div class="form-field">
+            <label for="uploadDescInput">Intake Custody Remarks</label>
+            <input type="text" id="uploadDescInput" class="text-input" placeholder="Acquired under legal chain of custody warrant." />
+          </div>
+        </div>
+        <div class="modal-bottom">
+          <button type="button" class="btn btn-secondary" id="cancelUploadModalBtn">Cancel</button>
+          <button type="submit" class="btn btn-primary">Upload & Seal Evidence</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- BULK IMPORT EVIDENCE MODAL -->
+  <div class="modal-backdrop hidden" id="bulkImportModal">
+    <div class="modal-panel modal-panel-wide">
+      <div class="modal-top">
+        <h3 class="modal-heading">Bulk Import Evidence</h3>
+        <button class="btn-close-modal" id="closeBulkModalBtn" type="button">✕</button>
+      </div>
+      <form id="bulkImportForm">
+        <div class="modal-content">
+          <div class="form-field">
+            <label>Items</label>
+            <textarea id="bulkImportTextarea" class="text-area" rows="9" placeholder="One item per line. Format:  Name | Content&#10;&#10;Exhibit-A | Raw payload bytes alpha&#10;Exhibit-B | Raw payload bytes beta&#10;Offsite-Drive-3 | Sector stream recovered"></textarea>
+            <div class="mono-hint" style="margin-top:4px;">Each line becomes a separate sealed evidence exhibit. Format: <code>Name | Content</code></div>
+          </div>
+          <div class="form-field">
+            <label for="bulkDescInput">Shared Intake Remarks (optional)</label>
+            <input type="text" id="bulkDescInput" class="text-input" placeholder="Bulk acquisition under warrant..." />
+          </div>
+        </div>
+        <div class="modal-bottom">
+          <button type="button" class="btn btn-secondary" id="cancelBulkModalBtn">Cancel</button>
+          <button type="submit" class="btn btn-primary">Import All Exhibits</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MINIMAL TOAST -->
+  <div class="minimal-toast hidden" id="minimalToast">
+    <span id="toastMessage">Action completed.</span>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+# Python & Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+backend/venv/
+*.pyc
+__pycache__/
+.pytest_cache/
+
+# Databases & SQLite files
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment Variables & Secrets
+.env
+backend/.env
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Storage artifacts (generated during tests/runs)
+backend/storage/artifacts/
+backend/storage/keystore.json
